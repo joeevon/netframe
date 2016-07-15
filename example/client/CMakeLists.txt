@@ -1,0 +1,4 @@
+add_subdirectory(client_tcp)
+add_subdirectory(client_tcp_con)
+add_subdirectory(client_unixsocket)
+add_subdirectory(client_udp)

@@ -1,0 +1,312 @@
+/****************************
+    FileName:netframe_structdefine.h
+    (C) Copyright 2014 by Careland
+    凯立德秘密信息
+    Description:
+    主要功能简述
+        cnv_structdefine 头文件
+    Note:
+    Author:WangZhiyong
+    Create Date: 2015-05-22
+*****************************/
+
+#ifndef __CNV_STRUCTDEFINE_H__
+#define __CNV_STRUCTDEFINE_H__
+
+#include "netframe/common_type.h"
+#include "netframe/cnv_queue.h"
+#include "netframe/cnv_base_define.h"
+#include "cnv_fifo.h"
+#include "netframe/cnv_blocking_queue.h"
+#include "netframe/cnv_lock_free_queue.h"
+#include <stdint.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+#define  MAX_INT_VALUE  2147483647  // int 最大值     
+#define  MAX_LISTEN_PORT  32    // 最大监听端口个数   
+#define  MAX_IO_THREAD    32    // I/O线程个数    
+#define  MAX_HANDLE_THREAD  32    // Handle线程个数     
+#define  MAX_AUXILIARY_THREAD  32    //Auxiliary线程个数     
+#define  DEFAULT_FIFO_CAPCITY  65536    //默认FIFO大小，必须为2的整数次方  2^16
+#define  DEFAULT_QUEUE_CAPCITY  50000    //默认queue大小    
+#define  DEFAULF_EPOLL_SIZE   30000      //epoll size   
+#define  DEFAULF_FILTED_CLIENTS   32
+#define  MAX_PACKET_SZIE  65000   //每个数据包的最大值
+#define  REMAIN_BUFFER_SIZE  1024     //remain size
+
+    typedef enum __enumDISTRIBUTE_TYPE
+    {
+        DISTRIBUTE_TYPE_WEIGHT = 1,     //权重
+        DISTRIBUTE_TYPE_HASH = 2,     //哈希
+        DISTRIBUTE_TYPE_PRESSURE = 3,     //负载
+    }
+    enumDISTRIBUTE_TYPE;
+
+    // HANDLE CONTEXT
+    typedef struct  __HANDLE_THREAD_CONTEXT
+    {
+        int  lthreadindex;
+        char  threadname[20];
+        int  Epollfd;
+        int  io_handle_eventfd;  //io唤醒handle
+        void *HashTimerTask;    //key:taskname   valude:cb function
+        CNV_UNBLOCKING_QUEUE *queParamFrames;   //框架handle使用的参数,有业务初始化好传进,所以由业务释放
+        LOCKFREE_QUEUE  io_handle_msgque;
+        CNV_UNBLOCKING_QUEUE  queuerespond;   //返回IO的数据
+        void *pHandleParam;    //handle参数
+    } HANDLE_THREAD_CONTEXT;
+
+    // HANDLE  ITEM
+    typedef  struct  __HANDLE_THREAD_ITEM
+    {
+        char  strThreadName[DEFAULT_ARRAY_SIZE];
+        int  lThreadIndex;     //开启线时自定义的序号
+        pthread_t  ulThreadId;    //线程ID
+        void   *ThreadHandle;
+        HANDLE_THREAD_CONTEXT  *pHandleContext;  //线程环境
+    } HANDLE_THREAD_ITEM;
+
+    // HANDLE CONFIG
+    typedef  struct  __NETFRAME_CONFIG_HANDLE
+    {
+        int  lNumberOfThread;
+        int  lIoHandleMsgSize;
+        HANDLE_THREAD_ITEM  szConfigHandleItem[MAX_HANDLE_THREAD];
+    } NETFRAME_CONFIG_HANDLE;
+
+    // IO CONTEXT
+    typedef struct __IO_THREAD_CONTEXT
+    {
+        int  Epollfd;
+        int  nDistributeType;   //分发类型  1、权重   2、哈希   3、负载
+        int  timerfd_socketclear;     //socket清理
+        int  timerfd_hearbeat;     //心跳
+        int  timerfd_monitor;     //服务监视
+        int  accept_io_eventfd;  //accept唤醒io
+        int  handle_io_eventfd;  //handle唤醒io
+        char  threadname[16];
+        short  threadindex;
+        int  SeedOfKey;
+        int  szIoRespHandle[32];   //io hanlde对应的线程关系
+        int nHandleThreadCount;  //io持有的hanlde线程个数
+        void       *HashConnidFd;   //key:connid  valude:socket element
+        void       *HashAddrFd;    //key:addr(ip:port)   valude:socket element
+        CNV_UNBLOCKING_QUEUE *queServer;   //服务器配置
+        CNV_UNBLOCKING_QUEUE *queDistribute;    //存放负载的线程
+        cnv_fifo *accept_io_msgque;  //accept -> io
+        CNV_BLOCKING_QUEUE  *handle_io_msgque;    //handle -> io
+        CNV_UNBLOCKING_QUEUE    *handle_msgque_one;    //handle -> io  self
+        CNV_UNBLOCKING_QUEUE    *handle_msgque_two;    //handle -> io  self
+        struct epoll_event  *EpollEvent;
+        HANDLE_THREAD_CONTEXT  *szHandleContext[MAX_HANDLE_THREAD];
+#ifdef _SERVER_MONITER_
+        long  StartTime;
+        long  Interval;
+        long  SvrPackNum;
+        long  ClnPackNum;
+        int  RespondTimes;
+#endif
+    } IO_THREAD_CONTEXT;
+
+    // IO  ITEM
+    typedef  struct  __IO_THREAD_ITEM
+    {
+        int  lThreadIndex;     //开启线时自定义的序号
+        int nDistributeType;   //分发类型  1、权重   2、哈希   3、负载
+        char  strThreadName[DEFAULT_ARRAY_SIZE];
+        char  strDistribution[DEFAULT_ARRAY_SIZE];
+        char  strAlgorithm[DEFAULT_ARRAY_SIZE];
+        pthread_t  ulThreadId;    //线程ID
+        void   *ThreadHandle;
+        IO_THREAD_CONTEXT  *pIoThreadContext;
+    } IO_THREAD_ITEM;
+
+    // IO  CONFIG
+    typedef  struct  __NETFRAME_CONFIG_IO
+    {
+        int lNumberOfThread;
+        IO_THREAD_ITEM szConfigIOItem[MAX_IO_THREAD];
+    } NETFRAME_CONFIG_IO;
+
+    //AUXILIARY CONTEXT
+    typedef struct  __AUXILIARY_THREAD_CONTEXT
+    {
+        short threadindex;
+        char threadname[20];
+        IO_THREAD_CONTEXT *pIoThreadContexts;   //所有IO线程的CONTEXT
+        CNV_UNBLOCKING_QUEUE queuerespond;   //返回IO的数据
+    } AUXILIARY_THREAD_CONTEXT;
+
+    //AUXILIARY ITEM
+    typedef  struct  __AUXILIARY_THREAD_ITEM
+    {
+        int  lThreadIndex;     //开启线时自定义的序号
+        char strThreadName[DEFAULT_ARRAY_SIZE];
+        pthread_t ulThreadId;    //线程ID
+        void *ThreadHandle;
+        AUXILIARY_THREAD_CONTEXT *pAuxiliaryThreadContext;
+    } AUXILIARY_THREAD_ITEM;
+
+    //AUXILIARY CONFIG
+    typedef  struct  __NETFRAME_CONFIG_AUXILIARY
+    {
+        int lNumberOfThread;
+        AUXILIARY_THREAD_ITEM szConfigAuxiliaryItem[MAX_AUXILIARY_THREAD];
+    } NETFRAME_CONFIG_AUXILIARY;
+
+    //HOST
+    typedef struct  __NETFRAME_HOST
+    {
+        char  strHost[DEFAULT_ARRAY_SIZE];
+    } NETFRAME_HOST;
+
+    //HOSTS
+    typedef struct  __NETFRAME_HOSTS
+    {
+        int  lNumOfHosts;
+        NETFRAME_HOST tHosts[DEFAULF_FILTED_CLIENTS];
+    } NETFRAME_HOSTS;
+
+    // ACCEPT  ITEM
+    typedef  struct  __ACCEPT_THREAD_ITEM
+    {
+        char  strHost[DEFAULT_ARRAY_SIZE];        //服务ip
+        unsigned int  ulPort;     //端口
+        unsigned int  uMapType;   //客户端映射方式:1.连接ID  2.客户端地址
+        char  strUnixDomainPath[256];     //unix.domain路径
+        char  strTransmission[DEFAULT_ARRAY_SIZE];     //传输协议
+        char  strDistribution[DEFAULT_ARRAY_SIZE];        //负载分发
+        char  strAlgorithm[DEFAULT_ARRAY_SIZE];         //分发比例
+        NETFRAME_HOSTS tAllowedClients;        //白名单
+        IO_THREAD_CONTEXT  *szIOThreadContext[MAX_IO_THREAD];   //所有IO线程的CONTEXT
+        CALLBACK_STRUCT_T  tCallback;
+        CNV_UNBLOCKING_QUEUE  *queDistribute;    //存放负载的线程
+    } ACCEPT_THREAD_ITEM;
+
+    // ACCEPT CONTEXT
+    typedef struct  __ACCEPT_THREAD_CONTEXT
+    {
+        int TcpListenSocket;
+        int UdpSocket;
+        int UnixListenSocket;
+        int  Epollfd;
+        void *HashFdListen;      //  key:socket  value:listen item
+        CNV_UNBLOCKING_QUEUE *queEventfds;  //需要唤醒队列的fd
+        IO_THREAD_CONTEXT *pIoThreadContexts;
+        ACCEPT_THREAD_ITEM  *pConfigAcceptItem;
+    } ACCEPT_THREAD_CONTEXT;
+
+    // ACCEPT CONFIG
+    typedef  struct  __NETFRAME_CONFIG_ACCEPT
+    {
+        int  lNumberOfPort;
+        pthread_t  ulThreadId;    //线程ID
+        void   *ThreadHandle;
+        ACCEPT_THREAD_CONTEXT  *pAcceptContext;
+        ACCEPT_THREAD_ITEM  szConfigAcceptItem[MAX_LISTEN_PORT];
+    } NETFRAME_CONFIG_ACCEPT;
+
+    //  IO_CALLBACK_T   ACCEPT -> IO
+    typedef  struct  __ACCEPT_TO_IO_DATA
+    {
+        int  fd;
+        unsigned int uMapType;
+        char strClientIp[DEFAULT_ARRAY_SIZE];
+        unsigned short uClientPort;
+        char  strTransmission[DEFAULT_ARRAY_SIZE];     // 传输协议,IO需根据传输协议来收数据
+        char  strProtocol[DEFAULT_ARRAY_SIZE]; //  服务服务协议
+        pfnCNV_PARSE_PROTOCOL  pfncnv_parse_protocol;     //协议解析回调函数
+        pfnCNV_HANDLE_BUSINESS  pfncnv_handle_business;   //业务处理回调函数
+    } ACCEPT_TO_IO_DATA;
+
+//配置文件路径
+    typedef  struct  __NETFRAME_CONFIG_PATH
+    {
+        char   strConfigPath[MAX_PATH];         //通用服务
+        char   strLogDir[MAX_PATH];                   //日志
+    } NETFRAME_CONFIG_PATH;
+
+    typedef  struct  __CLIENT_SOCKET_DATA
+    {
+        unsigned int  lDataRemain;       //剩下的数据长度(不完整的包)
+        char  *pDataBuffer;       //数据缓冲
+        char  *pMovePointer;   //移动遍历的指针
+    } CLIENT_SOCKET_DATA;
+
+    // CLIENT_SOCKET_ELEMENT
+    typedef  struct  __CLIENT_SOCKET_ELEMENT
+    {
+        int   lWriteRemain;   //未写完数据的长度
+        char  *pWriteRemain;  //未写完的数据
+        char  strTransmission[DEFAULT_ARRAY_SIZE];     //传输协议,IO需根据传输协议来收数据
+        char  strProtocol[DEFAULT_ARRAY_SIZE]; //服务协议
+        char strServiceName[DEFAULT_ARRAY_SIZE];  //服务名字,供找同类服务器使用
+        int lSourceCode;   //来源
+        struct sockaddr_in tClientAddr;
+        struct iovec tIovecClnData;
+        struct msghdr msg;       //数据内容
+        SERVER_SOCKET_DATA tSvrSockData;
+        CLIENT_SOCKET_DATA  SocketData;  //相关读数据
+        pfnCNV_PARSE_PROTOCOL  pfncnv_parse_protocol;   //协议解析回调函数
+        pfnCNV_HANDLE_BUSINESS  pfncnv_handle_business;   //业务处理回调函数
+        int  nReserveOne;   //保留变量
+        int  nReserverTwo;   //保留变量
+    } CLIENT_SOCKET_ELEMENT;
+
+    typedef  struct  __SERVER_SOCKET_ELEMENT
+    {
+        int  lWriteRemain;
+        char *pWriteRemain;
+        struct sockaddr_in tServerAddr;
+        struct iovec szIovecSvrData[2];
+        struct msghdr msg;       //数据内容
+        SERVER_SOCKET_DATA *pSvrSockData;
+    } SERVER_SOCKET_ELEMENT;
+
+    //socket element
+    typedef  struct  __SOCKET_ELEMENT
+    {
+        void *pConnId;   //连接id指针
+        int Socket;     //句柄
+        int lAction;   //1.请求 2.应答
+        unsigned int Time;    //时间戳
+        K_BOOL bIsToclear;    //是否清理
+        union
+        {
+            CLIENT_SOCKET_ELEMENT  tClnSockElement;
+            SERVER_SOCKET_ELEMENT tSvrSockElement;
+        } uSockElement;
+    } SOCKET_ELEMENT;
+
+    //cb function struct
+    typedef  struct  _TIMER_TASK_STRUCT
+    {
+        int timerfd;
+        pfnCNV_CALLBACK_FUNCTION  pfnCALLBACK_FUNCTION;
+    } TIMER_TASK_STRUCT;
+
+    // 全局配置
+    typedef  struct  __GLOBAL_PARAMS
+    {
+        NETFRAME_CONFIG_PATH   tConfigPath;
+        NETFRAME_CONFIG_ACCEPT  tConfigAccept;
+        NETFRAME_CONFIG_IO  tConfigIO;
+        NETFRAME_CONFIG_HANDLE  tConfigHandle;
+        NETFRAME_CONFIG_AUXILIARY tConfigAuxiliary;
+        TIMER_STRUCT  tHeartBeat;
+        TIMER_STRUCT  tSocketClear;
+        TIMER_STRUCT  tMonitor;
+        int nMaxBufferSize;
+    } GLOBAL_PARAMS;
+
+#ifdef __cplusplus
+};
+#endif
+
+#endif  //__CNV_STRUCTDEFINE_H__

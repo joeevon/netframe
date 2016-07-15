@@ -1,0 +1,12 @@
+include_directories(base)
+include_directories(osadapter)
+include_directories(container)
+include_directories(net)
+include_directories(frame)
+include_directories(include)
+
+add_subdirectory(base)
+add_subdirectory(osadapter)
+add_subdirectory(container)
+add_subdirectory(net)
+add_subdirectory(frame)
