@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -x
-#rm -rf publish lib/*
+rm -rf publish lib/*
 SOURCE_DIR=`pwd`
 
 BUILD_TYPE="debug"
