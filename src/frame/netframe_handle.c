@@ -162,7 +162,7 @@ void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleCon
         return;
     }
 
-    HANDLE_PARAMS *ptHandlzeParams = (pHandleContext->pHandleParam ? (HANDLE_PARAMS *)pHandleContext->pHandleParam : NULL);
+    HANDLE_PARAMS *ptHandleParams = (pHandleContext->pHandleParam ? (HANDLE_PARAMS *)pHandleContext->pHandleParam : NULL);
     if(pIOHanldeData->pfncnv_handle_business)
     {
         if(ptHandleParams && ptHandleParams->pBusinessParams)
