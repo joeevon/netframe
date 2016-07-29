@@ -5,6 +5,7 @@
 		    <protocol>admin</protocol>
 		    <host>0.0.0.0</host>
 		    <port>50205</port>
+			  <maptype>1</maptype>
 		    <transmission>TCP</transmission>
 		    <distribution>T1,T2,T3</distribution>
 		    <algorithm>1:1:1</algorithm>
