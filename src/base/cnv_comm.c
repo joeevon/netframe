@@ -9,8 +9,8 @@ Author:  WangZhiyong
     Create Date: 2015-05-07
 *********************************************************/
 
-#include "netframe/cnv_comm.h"
-#include "netframe/cnv_base_define.h"
+#include "cnv_comm.h"
+#include "cnv_base_define.h"
 
 #include <iconv.h>
 #include <sys/time.h>

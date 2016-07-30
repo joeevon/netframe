@@ -10,7 +10,7 @@
     Create Date: 2015-05-07
 *****************************/
 
-#include "netframe/netframe_main.h"
+#include "netframe_main.h"
 #include "netframe_common.h"
 #include "log/cnv_liblog4cplus.h"
 #include "netframe_io.h"
@@ -18,7 +18,7 @@
 #include "netframe_accept.h"
 #include "netframe_auxiliary.h"
 #include "cnv_thread.h"
-#include "netframe/cnv_comm.h"
+#include "cnv_comm.h"
 #include <signal.h>
 
 GLOBAL_PARAMS  g_params;      //全局配置参数

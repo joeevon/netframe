@@ -18,7 +18,7 @@ extern "C"
 {
 #endif
 
-#include "netframe/cnv_core_typedef.h"
+#include "cnv_core_typedef.h"
 
     extern int cnv_comm_xml_loadFile(char *strFilePath, char *strEncoding, void **ppOutDoc);
 

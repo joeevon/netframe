@@ -12,14 +12,14 @@
 
 #include "netframe_handle.h"
 #include "cnv_thread.h"
-#include "netframe/common_type.h"
-#include "netframe/cnv_core_typedef.h"
-#include "netframe/cnv_lock_free_queue.h"
-#include "netframe/netframe_net.h"
+#include "common_type.h"
+#include "cnv_core_typedef.h"
+#include "cnv_lock_free_queue.h"
+#include "netframe_net.h"
 #include "log/cnv_liblog4cplus.h"
 #include "netframe_common.h"
-#include "netframe/cnv_comm.h"
-#include "netframe/cnv_hashmap.h"
+#include "cnv_comm.h"
+#include "cnv_hashmap.h"
 #include <unistd.h>
 #include <time.h>
 #include <poll.h>

@@ -15,7 +15,7 @@
 ===========================================================================*/
 
 #include "cnv_adler32.h"
-#include "netframe/cnv_base_define.h"
+#include "cnv_base_define.h"
 
 #include <stdlib.h>
 #include <stdio.h>

@@ -11,17 +11,17 @@
     *****************************/
 
 #include "netframe_io.h"
-#include "netframe/common_type.h"
-#include "netframe/cnv_comm.h"
-#include "netframe/cnv_hashmap.h"
+#include "common_type.h"
+#include "cnv_comm.h"
+#include "cnv_hashmap.h"
 #include "cnv_thread.h"
-#include "netframe/netframe_net.h"
+#include "netframe_net.h"
 #include "cnv_net_define.h"
 #include "log/cnv_liblog4cplus.h"
-#include "netframe/cnv_lock_free_queue.h"
-#include "netframe/cnv_blocking_queue.h"
-#include "netframe/cnv_unblock_queue.h"
-#include "netframe/alg_md5.h"
+#include "cnv_lock_free_queue.h"
+#include "cnv_blocking_queue.h"
+#include "cnv_unblock_queue.h"
+#include "alg_md5.h"
 #include <sys/eventfd.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>

@@ -1,6 +1,6 @@
 
-#include "netframe/cnv_queue.h"
-#include "netframe/cnv_comm.h"
+#include "cnv_queue.h"
+#include "cnv_comm.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <errno.h>

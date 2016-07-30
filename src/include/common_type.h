@@ -18,10 +18,10 @@ extern "C"
 {
 #endif
 
-#include "netframe/cnv_core_typedef.h"
-#include "netframe/cnv_base_define.h"
-#include "netframe/cnv_unblock_queue.h"
-#include "netframe/cnv_blocking_queue.h"
+#include "cnv_core_typedef.h"
+#include "cnv_base_define.h"
+#include "cnv_unblock_queue.h"
+#include "cnv_blocking_queue.h"
 #include <stdint.h>
 
 #define  DEFAULT_HASHMAP_CAPCITY  30000    //默认hashmap大小 

@@ -25,7 +25,7 @@
 extern "C" {
 #endif // __cplusplus
 
-#include "netframe/cnv_core_typedef.h"
+#include "cnv_core_typedef.h"
 #include <pthread.h>
 
 #define MUTEX_HASHMAP_TOKEN "mutex_hashmap"

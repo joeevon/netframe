@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "netframe/alg_md5.h"
+#include "alg_md5.h"
 
 // 函数宏替换
 #define MD5Transform        fd39c02d0e290b55c

@@ -13,12 +13,12 @@
 #ifndef __CNV_STRUCTDEFINE_H__
 #define __CNV_STRUCTDEFINE_H__
 
-#include "netframe/common_type.h"
-#include "netframe/cnv_queue.h"
-#include "netframe/cnv_base_define.h"
+#include "common_type.h"
+#include "cnv_queue.h"
+#include "cnv_base_define.h"
 #include "cnv_fifo.h"
-#include "netframe/cnv_blocking_queue.h"
-#include "netframe/cnv_lock_free_queue.h"
+#include "cnv_blocking_queue.h"
+#include "cnv_lock_free_queue.h"
 #include <stdint.h>
 #include <netinet/in.h>
 #include <sys/socket.h>

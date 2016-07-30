@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include "netframe/cnv_hashmap.h"
-#include "netframe/cnv_base_define.h"
-#include "netframe/cnv_comm.h"
+#include "cnv_hashmap.h"
+#include "cnv_base_define.h"
+#include "cnv_comm.h"
 #include "log/cnv_liblog4cplus.h"
 #include "cnv_thread_sys.h"
 #include <stdio.h>

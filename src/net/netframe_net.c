@@ -9,14 +9,14 @@
     Author:WangZhiyong
     Create Date: 2015-05-07
 *****************************/
-#include "netframe/netframe_net.h"
-#include "netframe/cnv_comm.h"
-#include "netframe/netframe_main.h"
-#include "netframe/common_type.h"
+#include "netframe_net.h"
+#include "cnv_comm.h"
+#include "netframe_main.h"
+#include "common_type.h"
 #include "log/cnv_liblog4cplus.h"
 #include "cnv_adler32.h"
 #include "cnv_crc32.h"
-#include "netframe/cnv_base_define.h"
+#include "cnv_base_define.h"
 #include "cnv_net_define.h"
 #include <errno.h>
 #include <fcntl.h>
