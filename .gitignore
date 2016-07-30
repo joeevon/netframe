@@ -1,0 +1,6 @@
+/src/Debug
+/src/*.sdf
+/src/*.sln
+/src/*.vcxproj
+/src/*.filters
+/src/*.user
