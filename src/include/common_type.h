@@ -44,6 +44,27 @@ extern "C"
     }
     CNV_PARSE_RETURN;
 
+    typedef struct MONITOR_ELEMENT
+    {
+        uint16_t  nThreadIndex;
+        uint32_t  nClientConNum;  //客户端连接数
+        uint32_t  nRecvPackNum;  //总收包数
+        uint32_t  nRespondTimes;
+        uint32_t  nSvrPackNum;    //发送给服务端的包数
+        uint32_t  nClnPackNum;    //应答客户端包数
+        uint32_t  nSvrFailedNum;  //发送给服务端失败包数
+        uint32_t  nClnFailedNum;  //应答客户端失败包数
+        float  dFailedRate;
+        uint32_t  nServerNum;
+        uint32_t  nSvrConnNum;
+        uint32_t  nIoMsgQueCount;
+        uint16_t  nHandleThreadCount;
+        uint32_t  szHanldeMsgQueCount[32];
+    } MONITOR_ELEMENT;
+
+    struct  __IO_TO_HANDLE_DATA;
+    struct __HANDLE_TO_IO_HEAD;
+
     /*=======================================================
     功能:
         协议解析回调
@@ -64,10 +85,10 @@ extern "C"
     /*=======================================================
     功能:
         业务处理回调函数
+        queuerespond里的数据有业务申请内存，框架释放
     参数:
       =========================================================*/
-    struct  __IO_TO_HANDLE_DATA;
-    typedef void (*pfnCNV_HANDLE_BUSINESS)(const struct __IO_TO_HANDLE_DATA *req, CNV_UNBLOCKING_QUEUE *queuerespond, void *pHandleParam);
+    typedef void (*pfnCNV_HANDLE_BUSINESS)(const struct __IO_TO_HANDLE_DATA *ptHandleIoData, CNV_UNBLOCKING_QUEUE *queuerespond, void *pHandleParam);
 
     /*=======================================================
     功能:
@@ -78,9 +99,17 @@ extern "C"
     /*=======================================================
     功能:
         发送失败回调函数
+        queuerespond里的数据有业务申请内存，框架释放
     =========================================================*/
-    struct __HANDLE_TO_IO_HEAD;
     typedef void (*pfnSEND_FAILED_CALLBACK)(CNV_UNBLOCKING_QUEUE *queuerespond, const struct __HANDLE_TO_IO_HEAD *pHandleIOData);
+
+    /*=======================================================
+    功能:
+        监控回调函数
+        此处是io调用的回调函数，用handle给io的结构体也使用，便于请求服务的处理
+        ptHandleIoData由业务申请内存，框架释放
+    =========================================================*/
+    typedef int(*pfnCNV_MONITOR_CALLBACK)(MONITOR_ELEMENT *ptMonitorElement, struct __HANDLE_TO_IO_HEAD **ptHandleIoData);
 
     /*=======================================================
     功能:
@@ -92,7 +121,7 @@ extern "C"
         其它 失败
     =========================================================*/
     struct __CALLBACK_STRUCT_T;
-    extern void set_callback_function(int nCallbackType, struct __CALLBACK_STRUCT_T *pCallback);
+    extern void set_callback_function(int nCallbackType, struct  __CALLBACK_STRUCT_T *pCallback);
 
     /*=======================================================
     功能:
@@ -104,6 +133,14 @@ extern "C"
         其它 失败
     =========================================================*/
     extern int init_handle_params(void **pHandleParams);
+
+    /*=======================================================
+    功能:
+        io设置监控回调函数
+    说明:
+        无需监控回调函数，置空实现
+    =========================================================*/
+    extern void ioset_monitor_callback(pfnCNV_MONITOR_CALLBACK *pfncnv_monitor_callback);
 
     //hashmap value
     typedef  struct  __HASHMAP_VALUE
@@ -181,7 +218,7 @@ extern "C"
     //timer task
     typedef  struct __TIMER_TASK
     {
-        K_CHAR  strTaskName[64];
+        K_CHAR strTaskName[64];
         TIMER_STRUCT tTimer;
     } TIMER_TASK;
 

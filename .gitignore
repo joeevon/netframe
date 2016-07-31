@@ -4,3 +4,4 @@
 /src/*.vcxproj
 /src/*.filters
 /src/*.user
+/src/.vs/netframe/v14/*.suo

@@ -141,7 +141,6 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
         LOG_SYS_ERROR("netframe_init_path failed!");
         return  nRet;
     }
-
     LOG_SYS_DEBUG("ConfigPath: %s", g_params.tConfigPath.strConfigPath);
 
     //初始化框架配置
