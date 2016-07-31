@@ -61,6 +61,7 @@ void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
     LOG_ACC_DEBUG("io %d, RepTimesPerSecond=%d", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.nRespondTimes / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, RcvPackNumPerSecond=%d", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.nRecvPackNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, SvrPackNumPerSecond=%d", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.nSvrPackNum / g_params.tMonitor.interval_sec);
+    LOG_ACC_DEBUG("io %d, SvrFailedNumPerSecond=%d", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.nSvrFailedNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, ClnPackNumPerSecond=%d", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.nClnPackNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, SeedOfKey=%d", pIoThreadContext->threadindex, pIoThreadContext->SeedOfKey);
     if(pIoThreadContext->queServer)
