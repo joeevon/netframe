@@ -1,0 +1,8 @@
+/src/.vs/netframe/v14/*.suo
+/src/*.db
+/src/*.sdf
+/src/*.sln
+/src/*.vcxproj
+/src/*.filters
+/src/*.user
+/src/Debug
