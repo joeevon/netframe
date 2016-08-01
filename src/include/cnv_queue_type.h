@@ -15,7 +15,7 @@ Description: 非阻塞消息队列
 extern "C" {
 #endif
 
-#include "netframe/cnv_core_typedef.h"
+#include "cnv_core_typedef.h"
 #include <sys/queue.h>
 #include <pthread.h>
 #include <stdbool.h>

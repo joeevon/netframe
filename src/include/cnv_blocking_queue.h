@@ -20,7 +20,7 @@ extern "C" {
 #endif
 
 #include "cnv_queue_type.h"
-#include "netframe/cnv_unblock_queue.h"
+#include "cnv_unblock_queue.h"
 
     typedef struct __blocking_queue_ex_t
     {

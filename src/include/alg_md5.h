@@ -46,7 +46,7 @@
 #ifndef __ALG_COMMON_H__2012
 #define __ALG_COMMON_H__2012
 
-#include "netframe/cnv_core_typedef.h"
+#include "cnv_core_typedef.h"
 
 // 常量宏定义
 #define ALG_LIB_VERSION          "2.0.0"   // 库版本号
