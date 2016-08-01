@@ -13,12 +13,12 @@
 #ifndef __CNV_STRUCTDEFINE_H__
 #define __CNV_STRUCTDEFINE_H__
 
-#include "netframe/common_type.h"
-#include "netframe/cnv_queue.h"
-#include "netframe/cnv_base_define.h"
+#include "common_type.h"
+#include "cnv_queue.h"
+#include "cnv_base_define.h"
 #include "cnv_fifo.h"
-#include "netframe/cnv_blocking_queue.h"
-#include "netframe/cnv_lock_free_queue.h"
+#include "cnv_blocking_queue.h"
+#include "cnv_lock_free_queue.h"
 #include <stdint.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -95,23 +95,18 @@ extern "C"
         int  SeedOfKey;
         int  szIoRespHandle[32];   //io hanlde对应的线程关系
         int nHandleThreadCount;  //io持有的hanlde线程个数
-        void       *HashConnidFd;   //key:connid  valude:socket element
-        void       *HashAddrFd;    //key:addr(ip:port)   valude:socket element
+        void  *HashConnidFd;   //key:connid  valude:socket element
+        void  *HashAddrFd;    //key:addr(ip:port)   valude:socket element
         CNV_UNBLOCKING_QUEUE *queServer;   //服务器配置
         CNV_UNBLOCKING_QUEUE *queDistribute;    //存放负载的线程
         cnv_fifo *accept_io_msgque;  //accept -> io
         CNV_BLOCKING_QUEUE  *handle_io_msgque;    //handle -> io
-        CNV_UNBLOCKING_QUEUE    *handle_msgque_one;    //handle -> io  self
-        CNV_UNBLOCKING_QUEUE    *handle_msgque_two;    //handle -> io  self
+        CNV_UNBLOCKING_QUEUE  *handle_msgque_one;    //handle -> io  self
+        CNV_UNBLOCKING_QUEUE  *handle_msgque_two;    //handle -> io  self
         struct epoll_event  *EpollEvent;
         HANDLE_THREAD_CONTEXT  *szHandleContext[MAX_HANDLE_THREAD];
-#ifdef _SERVER_MONITER_
-        long  StartTime;
-        long  Interval;
-        long  SvrPackNum;
-        long  ClnPackNum;
-        int  RespondTimes;
-#endif
+		pfnCNV_MONITOR_CALLBACK  pfncnv_monitor_callback;
+        MONITOR_ELEMENT tMonitorElement;
     } IO_THREAD_CONTEXT;
 
     // IO  ITEM

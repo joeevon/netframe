@@ -13,7 +13,7 @@
 #ifndef __CNV_THREAD_H__
 #define __CNV_THREAD_H__
 
-#include "netframe/cnv_core_typedef.h"
+#include "cnv_core_typedef.h"
 #include <pthread.h>
 
 #ifdef __cplusplus

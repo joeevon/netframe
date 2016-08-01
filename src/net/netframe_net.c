@@ -9,14 +9,14 @@
     Author:WangZhiyong
     Create Date: 2015-05-07
 *****************************/
-#include "netframe/netframe_net.h"
-#include "netframe/cnv_comm.h"
-#include "netframe/netframe_main.h"
-#include "netframe/common_type.h"
+#include "netframe_net.h"
+#include "cnv_comm.h"
+#include "netframe_main.h"
+#include "common_type.h"
 #include "log/cnv_liblog4cplus.h"
 #include "cnv_adler32.h"
 #include "cnv_crc32.h"
-#include "netframe/cnv_base_define.h"
+#include "cnv_base_define.h"
 #include "cnv_net_define.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -30,46 +30,13 @@
 
 void netframe_print_errinfo(int nErrno, char *pAddrIP, unsigned int ulPort)
 {
-    if(nErrno == EINPROGRESS)
-        LOG_SYS_ERROR("Connection cannot be completed immediately, error type:EINPROGRESS, errno:%d.", nErrno);
-    else if(nErrno == EINTR)
-        LOG_SYS_ERROR("The system call was interrupted by a signal that was caught, error type:EINTR, errno:%d.", nErrno);
-    else if(nErrno == EISCONN)
-        LOG_SYS_ERROR("The socket is already connected, error type:EISCONN, errno:%d.", nErrno);
-    else if(nErrno == EAGAIN)
-        LOG_SYS_ERROR("No more free local ports or insufficient entries in the routing cache, error type:EAGAIN, errno:%d.", nErrno);
-    else if(nErrno == EADDRINUSE)
-        LOG_SYS_ERROR("Local address is already in use, error type:EADDRINUSE, errno:%d.", nErrno);
-    else if(nErrno == EADDRNOTAVAIL)
-        LOG_SYS_ERROR("Non-existent interface was requested or the requested address was not local, error type:EADDRNOTAVAIL, errno:%d.", nErrno);
-    else if(nErrno == ECONNREFUSED)
-        LOG_SYS_ERROR("No-one listening on the remote address, error type:ECONNREFUSED, errno:%d.", nErrno);
-    else if(nErrno == ENETUNREACH)
-        LOG_SYS_ERROR("Network is unreachable, error type:ENETUNREACH, errno:%d.", nErrno);
-    else if(nErrno == EACCES)
-        LOG_SYS_ERROR("The  user tried to connect to a broadcast address without having the socket broadcast flag enabled or the con-nection request failed because of a local firewall rule, error type:EACCES, errno:%d.", nErrno);
-    else if(nErrno == EPERM)
-        LOG_SYS_ERROR("The  user tried to connect to a broadcast address without having the socket broadcast flag enabled or the con-nection request failed because of a local firewall rule, error type:EPERM, errno:%d.", nErrno);
-    else if(nErrno == EAFNOSUPPORT)
-        LOG_SYS_ERROR("The passed address didn’t have the correct address family in its sa_family field, error type:EAFNOSUPPORT, errno:%d.", nErrno);
-    else if(nErrno == EALREADY)
-        LOG_SYS_ERROR("The socket is non-blocking and a previous connection attempt has not yet been completed, error type:EALREADY, errno:%d.", nErrno);
-    else if(nErrno == EBADF)
-        LOG_SYS_ERROR("The file descriptor is not a valid index in the descriptor table, error type:EBADF, errno:%d.", nErrno);
-    else if(nErrno == EFAULT)
-        LOG_SYS_ERROR("The socket structure address is outside the user’s address space, error type:EFAULT, errno:%d.", nErrno);
-    else if(nErrno == ENOTSOCK)
-        LOG_SYS_ERROR("The file descriptor is not associated with a socket, error type:ENOTSOCK, errno:%d.", nErrno);
-    else if(nErrno == ENOMEM)
-        LOG_SYS_ERROR("unable to allocate memory for internal tables, error type:ENOMEM, errno:%d.", nErrno);
-    else if(nErrno == ECONNREFUSED)
-        LOG_SYS_ERROR("No one listening on the remote address, error type:ECONNREFUSED, errno:%d.", nErrno);
-    else
-        LOG_SYS_ERROR("unrecognised errno:%d!", nErrno);
-
     if(pAddrIP)
     {
-        LOG_SYS_ERROR("ip:%s, port:%u", pAddrIP, ulPort);
+        LOG_SYS_ERROR("%s, ip:%s, port:%u", strerror(nErrno), pAddrIP, ulPort);
+    }
+    else
+    {
+        LOG_SYS_ERROR("%s", strerror(nErrno));
     }
 }
 
@@ -540,7 +507,6 @@ int netframe_sendmsg(int Socket, struct msghdr *pmsg, int nDataLen, int *pnLenAl
     if(nSendLen < 0)
     {
         int nErrno = errno;
-        LOG_SYS_ERROR("nErrno:%d", nErrno);
         if(nErrno == EAGAIN)
         {
             LOG_SYS_DEBUG("EAGAIN happens");

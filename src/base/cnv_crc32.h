@@ -20,7 +20,7 @@ extern "C" {
 //#include "cnv_net_datatype.h"
 //#include "cnv_web_svc_datatype.h"
 
-#include "netframe/cnv_core_typedef.h"
+#include "cnv_core_typedef.h"
 
     /* CRC context. */
     typedef struct __tagNAVI_SVC_CRC32_CONTEXT

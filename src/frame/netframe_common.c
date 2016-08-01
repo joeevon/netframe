@@ -10,14 +10,14 @@ Author:  WangZhiyong
 *********************************************************/
 
 #include "netframe_common.h"
-#include "netframe/cnv_hashmap.h"
+#include "cnv_hashmap.h"
 #include "log/cnv_liblog4cplus.h"
-#include "netframe/cnv_xml_parse.h"
-#include "netframe/netframe_net.h"
-#include "netframe/cnv_base_define.h"
-#include "netframe/cnv_comm.h"
+#include "cnv_xml_parse.h"
+#include "netframe_net.h"
+#include "cnv_base_define.h"
+#include "cnv_comm.h"
 #include "cnv_net_define.h"
-#include "netframe/common_type.h"
+#include "common_type.h"
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 #include <libxml/xpath.h>
@@ -551,7 +551,7 @@ int  netframe_heart_beat(int timerfd_hearbeat, IO_THREAD_CONTEXT *pIoThreadConte
 
             void *pOutValue = NULL;
             int nRet = cnv_hashmap_get(pIoThreadContext->HashAddrFd, strKey, &pOutValue);
-            if(nRet == K_SUCCEED)   //能找的到,则连接存在
+            if(nRet == K_SUCCEED && pSvrSockData->pHeartBeat != NULL && pSvrSockData->lHeartBeatLen > 0)   //能找的到而且心跳包数据存在
             {
                 SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
                 nRet = netframe_write(pSocketElement->Socket, pSvrSockData->pHeartBeat, pSvrSockData->lHeartBeatLen, NULL);

@@ -18,7 +18,7 @@ extern "C"
 {
 #endif
 
-#include "netframe/common_type.h"
+#include "common_type.h"
 
     /*=======================================================
     功能:

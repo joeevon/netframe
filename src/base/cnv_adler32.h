@@ -17,7 +17,7 @@
 extern "C" {
 #endif // __cplusplus
 
-#include "netframe/cnv_core_typedef.h"
+#include "cnv_core_typedef.h"
 
     /*=======================================================
       功能:

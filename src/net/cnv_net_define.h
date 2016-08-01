@@ -13,7 +13,7 @@
 #ifndef __CNV_NET__DEFINE_H__
 #define __CNV_NET__DEFINE_H__
 
-#include "netframe/cnv_core_typedef.h"
+#include "cnv_core_typedef.h"
 
 #ifdef __cplusplus
 extern "C"

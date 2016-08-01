@@ -160,7 +160,7 @@ extern "C"
 
     typedef  struct  __SERVER_SOCKET_DATA
     {
-        K_BOOL bisReqLogin;   //是否发送登录请求
+        K_BOOL isReqLogin;   //是否发送登录请求
         int  lPort;   //端口
         int  lHeartBeatLen;   //心跳包长度
         char *pHeartBeat;    //心跳包数据

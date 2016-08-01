@@ -12,7 +12,7 @@ Note:
 
 #include "netframe_admin.h"
 #include "netframe_structdefine.h"
-#include "netframe/cnv_comm.h"
+#include "cnv_comm.h"
 #include "log/cnv_liblog4cplus.h"
 #include <string.h>
 #include <unistd.h>

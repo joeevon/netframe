@@ -1,6 +1,6 @@
 #include "cnv_thread_sys.h"
 #include "cnv_thread_basic.h"
-#include "netframe/cnv_comm.h"
+#include "cnv_comm.h"
 #include <pthread.h>
 #include <signal.h>
 #include <semaphore.h>
