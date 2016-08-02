@@ -83,6 +83,7 @@ extern "C"
     // IO CONTEXT
     typedef struct __IO_THREAD_CONTEXT
     {
+        char strStartTime[64];
         int  Epollfd;
         int  nDistributeType;   //分发类型  1、权重   2、哈希   3、负载
         int  timerfd_socketclear;     //socket清理

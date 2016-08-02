@@ -46,16 +46,15 @@ extern "C"
 
     typedef struct MONITOR_ELEMENT
     {
+        char strStartTime[64];
         uint16_t  nThreadIndex;
         uint32_t  nClientConNum;  //客户端连接数
-        uint32_t  nRecvPackNum;  //总收包数
+        uint64_t  lRecvPackNum;  //总收包数
+        uint64_t  lRecvLength;
         uint32_t  nRespondTimes;
-        uint32_t  nSvrPackNum;    //发送给服务端的包数
-        uint32_t  nClnPackNum;    //应答客户端包数
-        uint32_t  nSvrFailedNum;  //发送给服务端失败包数
-        uint32_t  nClnFailedNum;  //应答客户端失败包数
-        float  dFailedRate;
-        uint32_t  nServerNum;
+        uint64_t  lSendLength;
+        uint32_t  lSvrPackNum;    //发送给服务端的包数
+		uint64_t  lSvrFailedNum;  //发送给服务端失败包数
         uint32_t  nSvrConnNum;
         uint32_t  nIoMsgQueCount;
         uint16_t  nHandleThreadCount;
