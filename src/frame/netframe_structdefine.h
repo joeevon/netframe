@@ -34,7 +34,7 @@ extern "C"
 #define  MAX_HANDLE_THREAD  32    // Handle线程个数     
 #define  MAX_AUXILIARY_THREAD  32    //Auxiliary线程个数     
 #define  DEFAULT_FIFO_CAPCITY  65536    //默认FIFO大小，必须为2的整数次方  2^16
-#define  DEFAULT_QUEUE_CAPCITY  50000    //默认queue大小    
+#define  DEFAULT_QUEUE_CAPCITY  300000    //默认queue大小    
 #define  DEFAULF_EPOLL_SIZE   30000      //epoll size   
 #define  DEFAULF_FILTED_CLIENTS   32
 #define  MAX_PACKET_SZIE  65000   //每个数据包的最大值
