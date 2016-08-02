@@ -49,7 +49,8 @@ extern "C"
         char strStartTime[64];
         uint16_t  nThreadIndex;
         uint32_t  nClientConNum;  //客户端连接数
-        uint64_t  lRecvPackNum;  //总收包数
+		uint64_t  lRecvPackNum;  //总收包数
+		uint64_t  lParsePackNum;  //解析出来的包数
         uint64_t  lRecvLength;
         uint32_t  nRespondTimes;
         uint64_t  lSendLength;

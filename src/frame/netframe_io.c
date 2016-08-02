@@ -59,7 +59,8 @@ int io_send_monitor(IO_THREAD_CONTEXT *pIoThreadContext)
 void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
 {
     LOG_ACC_DEBUG("io %d, RepTimesPerSecond=%d", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.nRespondTimes / g_params.tMonitor.interval_sec);
-    LOG_ACC_DEBUG("io %d, RcvPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvPackNum / g_params.tMonitor.interval_sec);
+	LOG_ACC_DEBUG("io %d, RcvPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvPackNum / g_params.tMonitor.interval_sec);
+	LOG_ACC_DEBUG("io %d, ParsePackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lParsePackNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, SvrPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lSvrPackNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, SvrFailedNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lSvrFailedNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, SeedOfKey=%d", pIoThreadContext->threadindex, pIoThreadContext->SeedOfKey);
@@ -1135,6 +1136,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         {
             continue;
         }
+        pIoThreadContext->tMonitorElement.lParsePackNum++;
 
         IO_TO_HANDLE_DATA *pIOHanldeData = (IO_TO_HANDLE_DATA *)cnv_comm_Malloc(sizeof(IO_TO_HANDLE_DATA));    //io->handle  header
         if(!pIOHanldeData)
@@ -1169,8 +1171,9 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
             LOG_SYS_ERROR("queue is full!");
             cnv_comm_Free(pPacket);
             cnv_comm_Free(pIOHanldeData);
-            ptClnSockData->lDataRemain = 0;   //此处因队列已满,把未解析完的数据丢弃;也可不丢弃,下次解析,需要修改上面的数据拼接
-            break;
+            //ptClnSockData->lDataRemain = 0;   //此处因队列已满,把未解析完的数据丢弃;也可不丢弃,继续解析
+            pIoThreadContext->tMonitorElement.lSvrFailedNum++;
+            continue;
         }
 
         uint64_t ulWakeup = 1;   //任意值,无实际意义
