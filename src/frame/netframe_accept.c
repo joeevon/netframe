@@ -354,6 +354,7 @@ int  accept_thread_run(void *pThreadParameter)
                 lClientfd = accept4(szEpollEvent[i].data.fd, (struct sockaddr *)&tClientAddr, &lClientLen, SOCK_NONBLOCK | SOCK_CLOEXEC);
                 if(lClientfd == -1)
                 {
+                    LOG_SYS_ERROR("%s.", strerror(errno));
                     continue;
                 }
                 LOG_SYS_DEBUG("accept, client ip:%s, socket = %d", inet_ntoa(tClientAddr.sin_addr), lClientfd);

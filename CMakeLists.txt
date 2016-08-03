@@ -8,7 +8,7 @@ cmake_minimum_required(VERSION 2.8)
 include_directories("/home/wangzhiyong/netframe/src/include")
 link_directories("/home/wangzhiyong/netframe/lib")
 
-#ucloud(liblog4cplus,netframe)
+#ucloud(liblog4cplus)
 include_directories("/usr/local/ucloud/include")
 link_directories("/usr/local/ucloud/lib64")
 
@@ -31,9 +31,6 @@ else()
     set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG -std=gnu99")
     set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -std=gnu++0x")
 endif()
-
-list(APPEND CMAKE_C_FLAGS "-D_SERVER_MONITER_")
-list(APPEND CMAKE_CXX_FLAGS "-D_SERVER_MONITER_")
 
 set(EXECUTABLE_OUTPUT_PATH ${PROJECT_BINARY_DIR}/bin)
 set(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
