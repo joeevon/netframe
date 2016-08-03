@@ -5,7 +5,7 @@
 		    <protocol>admin</protocol>
 		    <host>0.0.0.0</host>
 		    <port>50205</port>
-			  <maptype>1</maptype>
+			 <maptype>1</maptype>
 		    <transmission>TCP</transmission>
 		    <distribution>T1,T2,T3</distribution>
 		    <algorithm>1:1:1</algorithm>
@@ -112,5 +112,6 @@
 			<intervalsec>3</intervalsec>
 			<intervalnsec>0</intervalnsec>
 	</monitor>
-	<iohandlemsgsize>500000</iohandlemsgsize>
+	<handleiomsgsize>100000</handleiomsgsize>
+	<iohandlemsgsize>100000</iohandlemsgsize>
 </root>
