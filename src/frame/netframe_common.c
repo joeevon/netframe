@@ -413,9 +413,23 @@ int netframe_init_config()
     }
     //====================END OF MONITOR=======================
 
+    //=====================HANDLEIOMSGSIZE============================
+    char nodeValue[128] = { 0 };
+    char errMsg[64] = { 0 };
+
+    nRet = cnv_comm_xml_GetValue_ByPath(pDoc, "/root/handleiomsgsize", nodeValue, sizeof(nodeValue), errMsg, sizeof(errMsg));
+    if(nRet != 0)
+    {
+        LOG_SYS_FATAL("read config node /root/handleiomsgsize value failed :%s,errcode:%d", errMsg, nRet);
+        xmlFreeDoc(pDoc);
+        return nRet;
+    }
+    g_params.tConfigIO.lHandleIoMsgSize = atoi(nodeValue);
+    //====================HANDLEIOMSGSIZE==============================
+
     //=====================IOHANDLEMSGSIZE============================
-    char nodeValue[128] = {0};
-    char errMsg[64] = {0};
+    bzero(nodeValue, sizeof(nodeValue));
+    bzero(errMsg, sizeof(errMsg));
 
     nRet = cnv_comm_xml_GetValue_ByPath(pDoc, "/root/iohandlemsgsize", nodeValue, sizeof(nodeValue), errMsg, sizeof(errMsg));
     if(nRet  != 0)
@@ -424,7 +438,6 @@ int netframe_init_config()
         xmlFreeDoc(pDoc);
         return nRet;
     }
-
     g_params.tConfigHandle.lIoHandleMsgSize = atoi(nodeValue);
     //====================IOHANDLEMSGSIZE==============================
 

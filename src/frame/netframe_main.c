@@ -80,7 +80,7 @@ int  get_svrconf_queue(CNV_UNBLOCKING_QUEUE **queServer)
     {
         return  CNV_ERR_MALLOC;
     }
-    initiate_unblock_queue(queue, DEFAULT_QUEUE_CAPCITY);
+    initiate_unblock_queue(queue, 5000);
     *queServer = queue;
 
     return CNV_ERR_OK;

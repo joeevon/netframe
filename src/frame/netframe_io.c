@@ -1488,21 +1488,21 @@ int  io_thread_init(IO_THREAD_ITEM  *pConfigIOItem, HANDLE_THREAD_CONTEXT *pHand
     {
         return  CNV_ERR_MALLOC;
     }
-    initiate_unblock_queue(pIoThreadContext->handle_msgque_one, DEFAULT_QUEUE_CAPCITY);     //handle one
+    initiate_unblock_queue(pIoThreadContext->handle_msgque_one, g_params.tConfigIO.lHandleIoMsgSize);     //handle one
 
     pIoThreadContext->handle_msgque_two = (CNV_UNBLOCKING_QUEUE *)cnv_comm_Malloc(sizeof(CNV_UNBLOCKING_QUEUE));
     if(!pIoThreadContext->handle_msgque_two)
     {
         return  CNV_ERR_MALLOC;
     }
-    initiate_unblock_queue(pIoThreadContext->handle_msgque_two, DEFAULT_QUEUE_CAPCITY);     //handle two
+    initiate_unblock_queue(pIoThreadContext->handle_msgque_two, g_params.tConfigIO.lHandleIoMsgSize);     //handle two
 
     pIoThreadContext->handle_io_msgque = (CNV_BLOCKING_QUEUE *)cnv_comm_Malloc(sizeof(CNV_BLOCKING_QUEUE));
     if(!pIoThreadContext->handle_io_msgque)
     {
         return CNV_ERR_MALLOC;
     }
-    initiate_block_queue(pIoThreadContext->handle_io_msgque, DEFAULT_QUEUE_CAPCITY, pIoThreadContext->handle_msgque_one);   // handle队列
+    initiate_block_queue(pIoThreadContext->handle_io_msgque, g_params.tConfigIO.lHandleIoMsgSize, pIoThreadContext->handle_msgque_one);   // handle队列
 
     pIoThreadContext->queDistribute = (CNV_UNBLOCKING_QUEUE *)cnv_comm_Malloc(sizeof(CNV_UNBLOCKING_QUEUE));
     if(!pIoThreadContext->queDistribute)

@@ -126,7 +126,8 @@ extern "C"
     // IO  CONFIG
     typedef  struct  __NETFRAME_CONFIG_IO
     {
-        int lNumberOfThread;
+		int lNumberOfThread;
+		int lHandleIoMsgSize;
         IO_THREAD_ITEM szConfigIOItem[MAX_IO_THREAD];
     } NETFRAME_CONFIG_IO;
 

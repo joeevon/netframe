@@ -40,7 +40,7 @@ int  accept_select_io_thread(ACCEPT_THREAD_ITEM *pAcceptItem, IO_THREAD_CONTEXT 
     *pIoThreadContext = pAcceptItem->szIOThreadContext[lIndex];
     if(!*pIoThreadContext)
     {
-        LOG_SYS_ERROR("accept select io thread failed!");
+        LOG_SYS_ERROR("accept select io thread failed, lIndex:%d", lIndex);
         return  CNV_ERR_SELECT_THREAD;
     }
 
@@ -388,7 +388,6 @@ int  accept_thread_run(void *pThreadParameter)
                 nRet = accept_select_io_thread(pAcceptItem, &pIoThreadContext, queEventfds);  //选择线程
                 if(nRet != CNV_ERR_OK)
                 {
-                    LOG_SYS_ERROR("accept_select_io_thread error!");
                     netframe_close_socket(lClientfd);
                     continue;
                 }
