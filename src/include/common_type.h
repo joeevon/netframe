@@ -49,13 +49,13 @@ extern "C"
         char strStartTime[64];
         uint16_t  nThreadIndex;
         uint32_t  nClientConNum;  //客户端连接数
-		uint64_t  lRecvPackNum;  //总收包数
-		uint64_t  lParsePackNum;  //解析出来的包数
         uint64_t  lRecvLength;
+        uint64_t  lRecvPackNum;  //总收包数
+        uint64_t  lParsePackNum;  //解析出来的包数
         uint32_t  nRespondTimes;
         uint64_t  lSendLength;
-        uint32_t  lSvrPackNum;    //发送给服务端的包数
-		uint64_t  lSvrFailedNum;  //发送给服务端失败包数
+        uint64_t  lSvrPackNum;    //发送给服务端的包数
+        uint64_t  lSvrFailedNum;  //发送给服务端失败包数
         uint32_t  nSvrConnNum;
         uint32_t  nIoMsgQueCount;
         uint16_t  nHandleThreadCount;
@@ -161,6 +161,8 @@ extern "C"
     typedef  struct  __SERVER_SOCKET_DATA
     {
         K_BOOL isReqLogin;   //是否发送登录请求
+        K_BOOL isRecvSvrData;  //服务端向客户端推送数据
+        time_t nStartConnect;   //开始连接时间
         int  lPort;   //端口
         int  lHeartBeatLen;   //心跳包长度
         char *pHeartBeat;    //心跳包数据

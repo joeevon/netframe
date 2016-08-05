@@ -110,7 +110,7 @@ extern "C"
         0    成功
         其它 失败
     =========================================================*/
-    int netframe_connect(int *pSocket, char  *pAddrIP, unsigned int  ulPort, int nMaxTimeout);
+    int netframe_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int nTimeOut);
 
     /*=======================================================
     功能:

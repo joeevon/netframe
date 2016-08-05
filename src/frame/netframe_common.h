@@ -154,7 +154,7 @@ extern "C"
            0    成功
            其它 失败
        =========================================================*/
-    extern int  hash_add_addrsocket(int Socket, SERVER_SOCKET_DATA *pSvrSockData, void *HashAddrFd, void *pConnId);
+    extern int  hash_add_addrsocket(int Socket, SERVER_SOCKET_DATA *pSvrSockData, void *HashAddrFd);
 
     /*=======================================================
       功能:
@@ -164,7 +164,7 @@ extern "C"
           0    成功
           其它 失败
       =========================================================*/
-    extern int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA  *pSvrSockData, IO_THREAD_CONTEXT *pIoThreadContext, char **out_pConnId);
+    extern int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA  *pSvrSockData, IO_THREAD_CONTEXT *pIoThreadContext);
 
     /*=======================================================
        功能:

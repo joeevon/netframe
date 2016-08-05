@@ -26,6 +26,7 @@
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
+#include <errno.h>
 
 K_BOOL earase_hashtimer_callback(void  *pKey, void  *pValue, void  *pContext, K_BOOL *bIsEarase)
 {
@@ -339,15 +340,15 @@ int  handle_thread_run(void *pThreadParameter)
             {
                 if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))   //错误
                 {
-                    LOG_SYS_ERROR("epoll event POLLHUP! socketfd:%d", szEpollEvent[i].data.fd);
+                    LOG_SYS_ERROR("%s", strerror(errno));
                 }
                 else if(szEpollEvent[i].events & POLLNVAL)
                 {
-                    LOG_SYS_ERROR("epoll event POLLNVAL! socketfd:%d", szEpollEvent[i].data.fd);
+                    LOG_SYS_ERROR("%s", strerror(errno));
                 }
                 else if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
                 {
-                    LOG_SYS_ERROR("epoll event POLLERR! conid:%s", (char *)szEpollEvent[i].data.ptr);
+                    LOG_SYS_ERROR("%s", strerror(errno));
                 }
                 else if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))     //读事件
                 {
@@ -374,7 +375,15 @@ int  handle_thread_run(void *pThreadParameter)
                         }
                     }
                 }
+                else
+                {
+                    LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
+                }
             }
+        }
+        else if(nCount < 0)
+        {
+            LOG_SYS_ERROR("%s", strerror(errno));
         }
     }
 

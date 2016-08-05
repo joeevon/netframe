@@ -32,7 +32,7 @@ void netframe_print_errinfo(int nErrno, char *pAddrIP, unsigned int ulPort)
 {
     if(pAddrIP)
     {
-        LOG_SYS_ERROR("%s, ip:%s, port:%u", strerror(nErrno), pAddrIP, ulPort);
+        LOG_SYS_ERROR("ip:%s, port:%u, %s", pAddrIP, ulPort, strerror(nErrno));
     }
     else
     {
@@ -151,62 +151,12 @@ int netframe_init_unixsocket(int *pSocket, struct sockaddr_un *pSockAddr)
     return CNV_ERR_OK;
 }
 
-int netframe_nonblock_connect(int *pnSockfd, int nTimeout)
+int netframe_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int nTimeOut)
 {
-    int Sockfd = *pnSockfd;
-    int nErrno = netframe_get_sokceterror(Sockfd);
-    netframe_print_errinfo(nErrno, NULL, 0);
-    if(nErrno == ECONNREFUSED)
-    {
-        return AGENT_NET_CONNECT_REFUSED;
-    }
-    else if(netframe_is_selfconnected(Sockfd))
-    {
-        LOG_SYS_ERROR("connect self!");
-        return AGENT_NET_CONNECT_SELF;
-    }
-
-    struct timeval timeout = { 0 };
-    timeout.tv_sec = nTimeout / 1000;
-    timeout.tv_usec = nTimeout % 1000;
-    fd_set  wt_set;
-    FD_ZERO(&wt_set);
-    FD_SET(Sockfd, &wt_set);
-
-    int nRet = select(Sockfd + 1, K_NULL, &wt_set, K_NULL, &timeout);
-    if(nRet < 0) //error
-    {
-        LOG_SYS_ERROR("nonblock connect error!");
-        netframe_print_errinfo(errno, 0, 0);
-        return AGENT_NET_NONBLOCK_CONNECT_SELECT;
-    }
-    else if(nRet == 0)   //timeout
-    {
-        LOG_SYS_ERROR("nonblock connect timeout!");
-        return AGENT_NET_NONBLOCK_CONNECT_TIMEOUT;
-    }
-
-    if(FD_ISSET(Sockfd, &wt_set))
-    {
-        LOG_SYS_DEBUG("netframe_nonblock_connect successd, Sockfd:%d", Sockfd);
-        return CNV_ERR_OK;
-    }
-    else
-    {
-        LOG_SYS_ERROR("nonblock connect failed!");
-        return AGENT_NET_CONNECT_FAILED;
-    }
-
-    return CNV_ERR_OK;
-}
-
-int netframe_connect_(int *pSocket, char *pAddrIP, unsigned int ulPort, int nEveryTimeout)
-{
-    int nRet = CNV_ERR_OK;
-
     int Sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_TCP);
-    if(Sockfd == INVALID_SOCKET)
+    if(Sockfd == -1)
     {
+        LOG_SYS_ERROR("%s", strerror(errno));
         return AGENT_NET_CREATE_SOCKET_FAILED;
     }
 
@@ -215,83 +165,66 @@ int netframe_connect_(int *pSocket, char *pAddrIP, unsigned int ulPort, int nEve
     inet_aton(pAddrIP, &(tServAddr.sin_addr));
     tServAddr.sin_port = htons((unsigned short)ulPort);
 
-    nRet = connect(Sockfd, (struct sockaddr *)&tServAddr, sizeof(struct sockaddr));
-    if(nRet != 0)
+    int nRet = connect(Sockfd, (struct sockaddr *)&tServAddr, sizeof(struct sockaddr));
+    if(nRet == 0)
+    {
+        LOG_SYS_INFO("connect %s %d success.", pAddrIP, ulPort);
+        *pSocket = Sockfd;
+        return CNV_ERR_OK;
+    }
+    else
     {
         int nErrno = errno;
-        netframe_print_errinfo(nErrno, pAddrIP, ulPort);
-        switch(nErrno)
+        LOG_SYS_ERROR("%s", strerror(nErrno));
+        if(nErrno != EINPROGRESS)
         {
-            case EINPROGRESS:
-            case EINTR:
-            case EISCONN:
-                nRet = netframe_nonblock_connect(&Sockfd, nEveryTimeout);
-                if(nRet != CNV_ERR_OK)
-                {
-                    netframe_close_socket(Sockfd);
-                    Sockfd = -1;
-                }
-                break;
-
-            case EAGAIN:
-            case EADDRINUSE:
-            case EADDRNOTAVAIL:
-            case ECONNREFUSED:
-            case ENETUNREACH:
-                netframe_close_socket(Sockfd);
-                Sockfd = -1;
-                break;
-
-            case EACCES:
-            case EPERM:
-            case EAFNOSUPPORT:
-            case EALREADY:
-            case EBADF:
-            case EFAULT:
-            case ENOTSOCK:
-                netframe_close_socket(Sockfd);
-                Sockfd = -1;
-                break;
-
-            default:
-                LOG_SYS_ERROR("unrecognised errno!");
-                netframe_close_socket(Sockfd);
-                Sockfd = -1;
-                break;
+            return -1;
         }
+    }
+
+    fd_set writefds;
+    FD_ZERO(&writefds);
+    FD_SET(Sockfd, &writefds);
+
+    struct timeval timeout;
+    timeout.tv_sec = nTimeOut / 1000000;
+    timeout.tv_usec = nTimeOut % 1000000;
+
+    nRet = select(Sockfd + 1, NULL, &writefds, NULL, &timeout);
+    if(nRet <= 0)
+    {
+        LOG_SYS_ERROR("%s", strerror(errno));
+        netframe_close_socket(Sockfd);
+        return -1;
+    }
+    LOG_SYS_DEBUG("return of select is %d", nRet);
+
+    if(FD_ISSET(Sockfd, &writefds) == 0)
+    {
+        LOG_SYS_ERROR("no events on Sockfd found");
+        netframe_close_socket(Sockfd);
+        return -1;
+    }
+
+    int nError = 0;
+    socklen_t nLength = sizeof(nError);
+    if(getsockopt(Sockfd, SOL_SOCKET, SO_ERROR, &nError, &nLength) < 0)
+    {
+        LOG_SYS_ERROR("%s", strerror(errno));
+        netframe_close_socket(Sockfd);
+        return -1;
+    }
+
+    if(nError != 0)
+    {
+        LOG_SYS_ERROR("connect %s %d failed, %s", pAddrIP, ulPort, strerror(nError));
+        netframe_close_socket(Sockfd);
+        return -1;
     }
 
     *pSocket = Sockfd;
-    return nRet;
-}
-
-int netframe_connect(int *pSocket, char  *pAddrIP, unsigned int  ulPort, int nMaxTimeout)
-{
-    int nRet = CNV_ERR_OK;
-    int nTimeout = ((nMaxTimeout > 0 && nMaxTimeout <= 200) ? nMaxTimeout : 200); //默认超时,毫秒
-
-    do
-    {
-        LOG_SYS_DEBUG("Timeout:%d, RemainTime:%d", nTimeout, nMaxTimeout);
-        nRet = netframe_connect_(pSocket, pAddrIP, ulPort, nTimeout);
-        if(nMaxTimeout == 0)   //最大超时已为0
-        {
-            return nRet;
-        }
-        if(nMaxTimeout - nTimeout > nTimeout * 2)
-        {
-            nMaxTimeout -= nTimeout;
-            nTimeout *= 2;      //超时时长为上一次的2倍
-        }
-        else
-        {
-            nTimeout = nMaxTimeout - nTimeout;    //剩下的时间
-            nMaxTimeout = 0;
-        }
-    }
-    while(nRet);
-
-    return nRet;
+    LOG_SYS_INFO("connect %s %d success.", pAddrIP, ulPort);
+    return 0;
 }
 
 int netframe_close_socket(int Socket)
@@ -351,9 +284,9 @@ int netframe_add_event(int Epollfd, int Socket, unsigned int ulEventType, char *
     }
 
     nRet = epoll_ctl(Epollfd, EPOLL_CTL_ADD, Socket, &tEpollEvent);
-    if(nRet == -1)
+    if(nRet != 0)
     {
-        LOG_SYS_ERROR("netframe_add_event error");
+        LOG_SYS_ERROR("%s", strerror(errno));
         return  AGENT_NET_ADD_EPOLL;
     }
 
@@ -369,7 +302,6 @@ int netframe_add_readevent(int Epollfd, int Socket, void *pConnId)
     nRet = netframe_add_event(Epollfd, Socket, ulEventType, pConnId);
     if(nRet != CNV_ERR_OK)
     {
-        LOG_SYS_ERROR("netframe_add_readevent error");
         return  AGENT_NET_ADD_READEPOLL;
     }
 
@@ -384,7 +316,6 @@ int netframe_add_writeevent(int Epollfd, int Socket, void *pConnId)
     nRet = netframe_add_event(Epollfd, Socket, ulEventType, pConnId);
     if(nRet != CNV_ERR_OK)
     {
-        LOG_SYS_ERROR("netframe_add_writeevent error");
         return  AGENT_NET_ADD_WRITEEPOLL;
     }
 
@@ -515,14 +446,6 @@ int netframe_sendmsg(int Socket, struct msghdr *pmsg, int nDataLen, int *pnLenAl
         {
             LOG_SYS_DEBUG("write is busy, error type:EINTR, nErrno:%d", nErrno);
         }
-        else if(nErrno == EWOULDBLOCK)
-        {
-            LOG_SYS_ERROR("EWOULDBLOCK happens");
-        }
-        else if(nErrno == EMSGSIZE)
-        {
-            LOG_SYS_ERROR("The socket type requires that message be sent atomically, and the size of the message to be sent made this impossible, error type:EMSGSIZE , nErrno:%d", nErrno);
-        }
         else
         {
             LOG_SYS_ERROR("%s", strerror(nErrno));
@@ -530,7 +453,7 @@ int netframe_sendmsg(int Socket, struct msghdr *pmsg, int nDataLen, int *pnLenAl
         }
     }
 
-    if(nSendLen != nDataLen && (nSendLen > 0 && pnLenAlreadyWrite))   //数据发送不完整
+    if(nSendLen < nDataLen && nSendLen >= 0 && pnLenAlreadyWrite)   //数据发送不完整
     {
         *pnLenAlreadyWrite = nSendLen;
         LOG_SYS_ERROR("write %d bytes, remain %d bytes.", nSendLen, (nDataLen - nSendLen));

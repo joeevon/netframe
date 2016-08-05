@@ -332,74 +332,85 @@ int  accept_thread_run(void *pThreadParameter)
     while(1)
     {
         nCount = epoll_wait(pAcceptContext->Epollfd, szEpollEvent, DEFAULF_EPOLL_SIZE, -1);
-        for(int i = 0; i < nCount; ++i)
+        if(nCount > 0)
         {
-            if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))
+            for(int i = 0; i < nCount; i++)
             {
-                LOG_SYS_FATAL("epoll event POLLHUP!");
-            }
-            if(szEpollEvent[i].events & POLLNVAL)
-            {
-                LOG_SYS_FATAL("epoll event POLLNVAL!");
-            }
-            if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
-            {
-                LOG_SYS_FATAL("epoll event POLLERR!");
-            }
-            if(szEpollEvent[i].events & EPOLLOUT)
-            {
-            }
-            if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))
-            {
-                lClientfd = accept4(szEpollEvent[i].data.fd, (struct sockaddr *)&tClientAddr, &lClientLen, SOCK_NONBLOCK | SOCK_CLOEXEC);
-                if(lClientfd == -1)
+                if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))
                 {
-                    LOG_SYS_ERROR("%s.", strerror(errno));
-                    continue;
+                    LOG_SYS_ERROR("%s", strerror(errno));
                 }
-                LOG_SYS_DEBUG("accept, client ip:%s, socket = %d", inet_ntoa(tClientAddr.sin_addr), lClientfd);
+                if(szEpollEvent[i].events & POLLNVAL)
+                {
+                    LOG_SYS_ERROR("%s", strerror(errno));
+                }
+                if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
+                {
+                    LOG_SYS_ERROR("%s", strerror(errno));
+                }
+                if(szEpollEvent[i].events & EPOLLOUT)
+                {
+                }
+                if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))
+                {
+                    lClientfd = accept4(szEpollEvent[i].data.fd, (struct sockaddr *)&tClientAddr, &lClientLen, SOCK_NONBLOCK | SOCK_CLOEXEC);
+                    if(lClientfd == -1)
+                    {
+                        LOG_SYS_ERROR("%s.", strerror(errno));
+                        continue;
+                    }
+                    LOG_SYS_DEBUG("accept, client ip:%s, socket = %d", inet_ntoa(tClientAddr.sin_addr), lClientfd);
 
-                ACCEPT_THREAD_ITEM *pAcceptItem = NULL;
-                nRet = accept_get_portinfo(szEpollEvent[i].data.fd, HashFdListen, &pAcceptItem);
-                if(nRet != CNV_ERR_OK)
-                {
-                    LOG_SYS_ERROR("accept_get_portinfo error!");
-                    netframe_close_socket(lClientfd);
-                    continue;
-                }
+                    ACCEPT_THREAD_ITEM *pAcceptItem = NULL;
+                    nRet = accept_get_portinfo(szEpollEvent[i].data.fd, HashFdListen, &pAcceptItem);
+                    if(nRet != CNV_ERR_OK)
+                    {
+                        LOG_SYS_ERROR("accept_get_portinfo error!");
+                        netframe_close_socket(lClientfd);
+                        continue;
+                    }
 
-                nRet = accept_filter_client(pAcceptItem, &tClientAddr);
-                if(nRet != 0)
-                {
-                    LOG_SYS_ERROR("not allowed client, ip:%s", inet_ntoa(tClientAddr.sin_addr));
-                    netframe_close_socket(lClientfd);
-                    continue;
-                }
+                    nRet = accept_filter_client(pAcceptItem, &tClientAddr);
+                    if(nRet != 0)
+                    {
+                        LOG_SYS_ERROR("not allowed client, ip:%s", inet_ntoa(tClientAddr.sin_addr));
+                        netframe_close_socket(lClientfd);
+                        continue;
+                    }
 
-                memset(&AcceptIOData, 0, sizeof(ACCEPT_TO_IO_DATA));
-                nRet = accept_set_iodata(lClientfd, pAcceptItem, &tClientAddr, &AcceptIOData);   //写入IO队列的数据
-                if(nRet != CNV_ERR_OK)
-                {
-                    LOG_SYS_ERROR("accept_set_iodata error!");
-                    netframe_close_socket(lClientfd);
-                    continue;
-                }
+                    memset(&AcceptIOData, 0, sizeof(ACCEPT_TO_IO_DATA));
+                    nRet = accept_set_iodata(lClientfd, pAcceptItem, &tClientAddr, &AcceptIOData);   //写入IO队列的数据
+                    if(nRet != CNV_ERR_OK)
+                    {
+                        LOG_SYS_ERROR("accept_set_iodata error!");
+                        netframe_close_socket(lClientfd);
+                        continue;
+                    }
 
-                nRet = accept_select_io_thread(pAcceptItem, &pIoThreadContext, queEventfds);  //选择线程
-                if(nRet != CNV_ERR_OK)
-                {
-                    netframe_close_socket(lClientfd);
-                    continue;
-                }
+                    nRet = accept_select_io_thread(pAcceptItem, &pIoThreadContext, queEventfds);  //选择线程
+                    if(nRet != CNV_ERR_OK)
+                    {
+                        netframe_close_socket(lClientfd);
+                        continue;
+                    }
 
-                nRet = cnv_fifo_put(pIoThreadContext->accept_io_msgque, (unsigned char *)&AcceptIOData, sizeof(ACCEPT_TO_IO_DATA));
-                if(nRet == 0)
-                {
-                    LOG_SYS_ERROR("cnv_fifo_put error!");
-                    netframe_close_socket(lClientfd);
-                    continue;
+                    nRet = cnv_fifo_put(pIoThreadContext->accept_io_msgque, (unsigned char *)&AcceptIOData, sizeof(ACCEPT_TO_IO_DATA));
+                    if(nRet == 0)
+                    {
+                        LOG_SYS_ERROR("cnv_fifo_put error!");
+                        netframe_close_socket(lClientfd);
+                        continue;
+                    }
                 }
+				else
+				{
+					LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
+				}
             }
+        }
+        else if(nCount < 0)
+        {
+            LOG_SYS_ERROR("%s", strerror(errno));
         }
 
         int nNumOfEvent = get_unblock_queue_count(queEventfds);

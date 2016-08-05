@@ -1,5 +1,5 @@
 /****************************
-    FileName:netframe_io.c
+    FileName:netframe_io.cgethash client of server failed
     (C) Copyright 2014 by Careland
     凯立德秘密信息
     Description:
@@ -29,6 +29,7 @@
 #include <errno.h>
 #include <poll.h>
 #include <unistd.h>
+#include <assert.h>
 
 int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle_io_msgque, void *HashAddrFd, void *HashConnidFd, IO_THREAD_CONTEXT *pIoThreadContext);
 
@@ -50,17 +51,16 @@ int io_send_monitor(IO_THREAD_CONTEXT *pIoThreadContext)
         return -1;
     }
 
-    //uint64_t ulWakeup = 0;
-    //write(pIoThreadContext->handle_io_eventfd, &ulWakeup, sizeof(ulWakeup));  //唤醒队列
     iothread_handle_respond(pIoThreadContext->Epollfd, pIoThreadContext->handle_io_eventfd, pIoThreadContext->handle_io_msgque, pIoThreadContext->HashAddrFd, pIoThreadContext->HashAddrFd, pIoThreadContext);
     return 0;
 }
 
 void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
 {
+    LOG_ACC_DEBUG("io %d, RecvLengthPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvLength / g_params.tMonitor.interval_sec);
+    LOG_ACC_DEBUG("io %d, RcvPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvPackNum / g_params.tMonitor.interval_sec);
+    LOG_ACC_DEBUG("io %d, ParsePackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lParsePackNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, RepTimesPerSecond=%d", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.nRespondTimes / g_params.tMonitor.interval_sec);
-	LOG_ACC_DEBUG("io %d, RcvPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvPackNum / g_params.tMonitor.interval_sec);
-	LOG_ACC_DEBUG("io %d, ParsePackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lParsePackNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, SvrPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lSvrPackNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, SvrFailedNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lSvrFailedNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, SeedOfKey=%d", pIoThreadContext->threadindex, pIoThreadContext->SeedOfKey);
@@ -98,6 +98,21 @@ void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
 
     bzero(&pIoThreadContext->tMonitorElement, sizeof(pIoThreadContext->tMonitorElement));
     LOG_ACC_DEBUG("");
+}
+
+void free_acceptio_fifo(cnv_fifo *accept_io_msgque)
+{
+    while(cnv_fifo_len(accept_io_msgque) > 0)
+    {
+        ACCEPT_TO_IO_DATA AcceptIOData = { 0 };
+        int nRet = cnv_fifo_get(accept_io_msgque, (unsigned char *)&AcceptIOData, sizeof(ACCEPT_TO_IO_DATA));
+        if(nRet == 0)     //可能为空消息
+        {
+            continue;
+        }
+
+        netframe_close_socket(AcceptIOData.fd);
+    }
 }
 
 void free_handleio_blockqueue(CNV_BLOCKING_QUEUE *block_queue)
@@ -272,54 +287,39 @@ int on_write_client_failed(HANDLE_TO_IO_DATA *pHandleIOData, IO_THREAD_CONTEXT  
     return CNV_ERR_OK;
 }
 
-int write_client_remain_data(int Epollfd, SOCKET_ELEMENT *pSocketElement, HANDLE_TO_IO_DATA *ptHandleIOData, int nLenAlreadyWrite)
+int save_client_remain_data(int Epollfd, SOCKET_ELEMENT *pSocketElement, HANDLE_TO_IO_DATA *ptHandleIOData, int nLenAlreadyWrite)
 {
     CLIENT_SOCKET_ELEMENT *ptClnSockElement = &pSocketElement->uSockElement.tClnSockElement;
 
-    if(nLenAlreadyWrite < ptClnSockElement->lWriteRemain)
+    if(nLenAlreadyWrite >= ptClnSockElement->lWriteRemain)  //只剩下新的数据
     {
-        int nRemainTmp = ptClnSockElement->lWriteRemain - nLenAlreadyWrite;
-        char *pRemainTmp = (char *)cnv_comm_Malloc(nRemainTmp);
-        memcpy(pRemainTmp, ptClnSockElement->pWriteRemain + nLenAlreadyWrite, nRemainTmp);
-
-        ptClnSockElement->lWriteRemain = nRemainTmp + ptHandleIOData->lDataLen;
-        if(ptClnSockElement->pWriteRemain)
-        {
-            cnv_comm_Free(ptClnSockElement->pWriteRemain);
-            ptClnSockElement->pWriteRemain = NULL;
-        }
-
-        ptClnSockElement->pWriteRemain = (char *)cnv_comm_Malloc(ptClnSockElement->lWriteRemain);
-        if(!ptClnSockElement->pWriteRemain)
-        {
-            return CNV_ERR_MALLOC;
-        }
-        memcpy(ptClnSockElement->pWriteRemain, pRemainTmp, nRemainTmp);
-        memcpy(ptClnSockElement->pWriteRemain + nRemainTmp, ptHandleIOData->pDataSend, ptHandleIOData->lDataLen);
-        cnv_comm_Free(pRemainTmp);
-    }
-    else
-    {
+        int nTmpRemain = ptClnSockElement->lWriteRemain;
         ptClnSockElement->lWriteRemain = ptClnSockElement->lWriteRemain + ptHandleIOData->lDataLen - nLenAlreadyWrite;
-        if(ptClnSockElement->pWriteRemain)
+        if(ptClnSockElement->pWriteRemain != NULL)
         {
             cnv_comm_Free(ptClnSockElement->pWriteRemain);
             ptClnSockElement->pWriteRemain = NULL;
         }
-
-        ptClnSockElement->pWriteRemain = (char *)cnv_comm_Malloc(ptClnSockElement->lWriteRemain);
-        if(!ptClnSockElement->pWriteRemain)
-        {
-            return CNV_ERR_MALLOC;
-        }
-        memcpy(ptClnSockElement->pWriteRemain, ptHandleIOData->pDataSend + (ptHandleIOData->lDataLen - ptClnSockElement->lWriteRemain), ptClnSockElement->lWriteRemain);
+        ptClnSockElement->pWriteRemain = (char *)malloc(ptClnSockElement->lWriteRemain);
+        assert(ptClnSockElement->pWriteRemain);
+        memcpy(ptClnSockElement->pWriteRemain, ptHandleIOData->pDataSend + (nLenAlreadyWrite - nTmpRemain), ptClnSockElement->lWriteRemain);
     }
-
-    int nRet = netframe_modify_readevent(Epollfd, pSocketElement->Socket, pSocketElement->pConnId);  //修改为写
-    if(nRet != CNV_ERR_OK)
+    else  //之前剩下的数据没写完
     {
-        LOG_SYS_ERROR("netframe_modify_readevent error!");
-        netframe_modify_writeevent(Epollfd, pSocketElement->Socket, pSocketElement->pConnId);
+        int nReRemain = ptClnSockElement->lWriteRemain - nLenAlreadyWrite;
+        char *pReRemain = (char *)malloc(nReRemain);
+        assert(pReRemain);
+        memcpy(pReRemain, ptClnSockElement->pWriteRemain + nLenAlreadyWrite, nReRemain);
+
+        ptClnSockElement->lWriteRemain = ptClnSockElement->lWriteRemain + ptHandleIOData->lDataLen - nLenAlreadyWrite;
+        if(ptClnSockElement->pWriteRemain != NULL)
+        {
+            cnv_comm_Free(ptClnSockElement->pWriteRemain);
+            ptClnSockElement->pWriteRemain = NULL;
+        }
+        memcpy(ptClnSockElement->pWriteRemain, pReRemain, nReRemain);
+        memcpy(ptClnSockElement->pWriteRemain + nReRemain, ptHandleIOData->pDataSend, ptHandleIOData->lDataLen);
+        cnv_comm_Free(pReRemain);
     }
 
     return CNV_ERR_OK;
@@ -373,7 +373,7 @@ int respond_write_client(int Epollfd, char *pOutValue, HANDLE_TO_IO_DATA *pHandl
         {
             LOG_SYS_ERROR("write imcompleted!");
             pSocketElement->Time = cnv_comm_get_utctime();
-            return write_client_remain_data(Epollfd, pSocketElement, pHandleIOData, nLenAlreadyWrite);
+            return save_client_remain_data(Epollfd, pSocketElement, pHandleIOData, nLenAlreadyWrite);
         }
         else if(nRet == AGENT_NET_CONNECTION_RESET || nRet == AGENT_NET_NOT_CONNECTED)   //连接异常,从hashmp删掉并找下一台服务器
         {
@@ -482,59 +482,39 @@ void on_write_server_failed(SERVER_SOCKET_DATA *pSvrSockData, HANDLE_TO_IO_DATA 
     LOG_SYS_DEBUG("on_write_server_failed end.");
 }
 
-int write_server_remain_data(IO_THREAD_CONTEXT *pIoThreadContext, SOCKET_ELEMENT *pSvrSocketElement, HANDLE_TO_IO_DATA *pHandleIOData, int nLenAlreadyWrite)
+int save_server_remain_data(IO_THREAD_CONTEXT *pIoThreadContext, SOCKET_ELEMENT *pSvrSocketElement, HANDLE_TO_IO_DATA *pHandleIOData, int nLenAlreadyWrite)
 {
     SERVER_SOCKET_ELEMENT *ptSvrSockElement = &pSvrSocketElement->uSockElement.tSvrSockElement;
 
-    void *pOutValue = NULL;
-    int nRet = cnv_hashmap_get(pIoThreadContext->HashConnidFd, pSvrSocketElement->pConnId, &pOutValue);
-    if(nRet != K_SUCCEED)
+    if(nLenAlreadyWrite >= ptSvrSockElement->lWriteRemain)   //只剩新的数据
     {
-        LOG_SYS_ERROR("gethash client of server failed!");
-        return nRet;
+        int nTmpRemain = ptSvrSockElement->lWriteRemain;
+        ptSvrSockElement->lWriteRemain = ptSvrSockElement->lWriteRemain + pHandleIOData->lDataLen - nLenAlreadyWrite;
+        if(ptSvrSockElement->pWriteRemain != NULL)
+        {
+            cnv_comm_Free(ptSvrSockElement->pWriteRemain);
+            ptSvrSockElement->pWriteRemain = NULL;
+        }
+        ptSvrSockElement->pWriteRemain = (char *)malloc(ptSvrSockElement->lWriteRemain);
+        assert(ptSvrSockElement->pWriteRemain);
+        memcpy(ptSvrSockElement->pWriteRemain, pHandleIOData->pDataSend + (nLenAlreadyWrite - nTmpRemain), ptSvrSockElement->lWriteRemain);
     }
-    SOCKET_ELEMENT *pClnSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
-    CLIENT_SOCKET_ELEMENT *ptClnSockElement = (CLIENT_SOCKET_ELEMENT *)(&pClnSocketElement->uSockElement.tClnSockElement);
-
-    if(nLenAlreadyWrite < ptSvrSockElement->lWriteRemain)
+    else  //之前剩下的数据没写完
     {
-        ptClnSockElement->lWriteRemain = ptSvrSockElement->lWriteRemain + pHandleIOData->lDataLen - nLenAlreadyWrite;
-        if(ptClnSockElement->pWriteRemain)
-        {
-            cnv_comm_Free(ptClnSockElement->pWriteRemain);
-            ptClnSockElement->pWriteRemain = NULL;
-        }
-        ptClnSockElement->pWriteRemain = (char *)cnv_comm_Malloc(ptClnSockElement->lWriteRemain);
-        if(!ptClnSockElement->pWriteRemain)
-        {
-            return CNV_ERR_MALLOC;
-        }
+        int nReRemain = ptSvrSockElement->lWriteRemain - nLenAlreadyWrite;
+        char *pReRemain = (char *)malloc(nReRemain);
+        assert(pReRemain);
+        memcpy(pReRemain, ptSvrSockElement->pWriteRemain + nLenAlreadyWrite, nReRemain);
 
-        memcpy(ptClnSockElement->pWriteRemain, ptSvrSockElement->pWriteRemain, ptSvrSockElement->lWriteRemain - nLenAlreadyWrite);
-        memcpy(ptClnSockElement->pWriteRemain + ptSvrSockElement->lWriteRemain - nLenAlreadyWrite, pHandleIOData->pDataSend, pHandleIOData->lDataLen);
-    }
-    else
-    {
-        ptClnSockElement->lWriteRemain = ptSvrSockElement->lWriteRemain + pHandleIOData->lDataLen - nLenAlreadyWrite;
-        if(ptClnSockElement->pWriteRemain)
+        ptSvrSockElement->lWriteRemain = ptSvrSockElement->lWriteRemain + pHandleIOData->lDataLen - nLenAlreadyWrite;
+        if(ptSvrSockElement->pWriteRemain != NULL)
         {
-            cnv_comm_Free(ptClnSockElement->pWriteRemain);
-            ptClnSockElement->pWriteRemain = NULL;
+            cnv_comm_Free(ptSvrSockElement->pWriteRemain);
+            ptSvrSockElement->pWriteRemain = NULL;
         }
-        ptClnSockElement->pWriteRemain = (char *)cnv_comm_Malloc(ptClnSockElement->lWriteRemain);
-        if(!ptClnSockElement->pWriteRemain)
-        {
-            return CNV_ERR_MALLOC;
-        }
-
-        memcpy(ptClnSockElement->pWriteRemain, pHandleIOData->pDataSend + (pHandleIOData->lDataLen - ptClnSockElement->lWriteRemain), ptClnSockElement->lWriteRemain);
-    }
-
-    nRet = netframe_modify_readevent(pIoThreadContext->Epollfd, pClnSocketElement->Socket, pClnSocketElement->pConnId);  //修改为写
-    if(nRet != CNV_ERR_OK)
-    {
-        LOG_SYS_ERROR("netframe_modify_readevent error!");
-        netframe_modify_writeevent(pIoThreadContext->Epollfd, pClnSocketElement->Socket, pClnSocketElement->pConnId);
+        memcpy(ptSvrSockElement->pWriteRemain, pReRemain, nReRemain);
+        memcpy(ptSvrSockElement->pWriteRemain + nReRemain, pHandleIOData->pDataSend, pHandleIOData->lDataLen);
+        cnv_comm_Free(pReRemain);
     }
 
     return CNV_ERR_OK;
@@ -582,15 +562,16 @@ int respond_write_next_server(SERVER_SOCKET_DATA *pSvrSockData, HANDLE_TO_IO_DAT
             while(entry != K_NULL)
             {
                 SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)(entry->value))->pValue);
-                if(!strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strServiceName, pSvrSockData->strServiceName)
-                        && strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strServerIp, pSvrSockData->strServerIp))  //同一类服务器
+                if(strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strServiceName, pSvrSockData->strServiceName) == 0
+                        && (strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strServerIp, pSvrSockData->strServerIp) != 0
+                            || pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->lPort != pSvrSockData->lPort))  //同一类服务器
                 {
                     nRet = sendmsg_to_server(pSocketElement, pHandleIOData, &nLenAlreadyWrite);
                     if(nRet == CNV_ERR_OK)
                     {
                         pSocketElement->uSockElement.tSvrSockElement.lWriteRemain = 0;
                         pSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
-                        LOG_SYS_DEBUG("write %s:%d %d bytes successfully", pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strServerIp, pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->lPort, pSocketElement->uSockElement.tSvrSockElement.lWriteRemain + pHandleIOData->lDataLen);
+                        LOG_SYS_INFO("write next server success");
                         return CNV_ERR_OK;
                     }
                     else
@@ -599,7 +580,7 @@ int respond_write_next_server(SERVER_SOCKET_DATA *pSvrSockData, HANDLE_TO_IO_DAT
                         {
                             LOG_SYS_ERROR("write imcompleted!");
                             pSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
-                            write_server_remain_data(pIoThreadContext, pSocketElement, pHandleIOData, nLenAlreadyWrite);
+                            save_server_remain_data(pIoThreadContext, pSocketElement, pHandleIOData, nLenAlreadyWrite);
                             return CNV_ERR_OK;
                         }
                         else if(nRet == AGENT_NET_CONNECTION_ABNORMAL)       //连接异常
@@ -625,7 +606,6 @@ int respond_write_server_again(SERVER_SOCKET_DATA *pSvrSockData, HANDLE_TO_IO_DA
     int nRet = netframe_reconnect_server(pSvrSockData, pIoThreadContext);
     if(nRet != CNV_ERR_OK)
     {
-        LOG_SYS_ERROR("reconnect %s:%d failed!", pSvrSockData->strServerIp, pSvrSockData->lPort);
         return nRet;
     }
 
@@ -658,7 +638,7 @@ int respond_write_server_again(SERVER_SOCKET_DATA *pSvrSockData, HANDLE_TO_IO_DA
         {
             LOG_SYS_ERROR("write imcompleted!");
             ptSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
-            return write_server_remain_data(pIoThreadContext, ptSocketElement, pHandleIOData, nLenAlreadyWrite);
+            return save_server_remain_data(pIoThreadContext, ptSocketElement, pHandleIOData, nLenAlreadyWrite);
         }
         else if(nRet == AGENT_NET_CONNECTION_ABNORMAL)     //连接异常
         {
@@ -688,9 +668,8 @@ int respond_write_server(int Epollfd, char *pOutValue, HANDLE_TO_IO_DATA *pHandl
     {
         if(nRet == AGENT_NET_WRITE_INCOMPLETED)  //保存未写完数据,修改epoll事件
         {
-            LOG_SYS_ERROR("write imcompleted!");
             pSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
-            return write_server_remain_data(pIoThreadContext, pSocketElement, pHandleIOData, nLenAlreadyWrite);
+            return save_server_remain_data(pIoThreadContext, pSocketElement, pHandleIOData, nLenAlreadyWrite);
         }
         else if(nRet == AGENT_NET_CONNECTION_ABNORMAL)    //连接异常
         {
@@ -773,11 +752,7 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
             if(nRet == CNV_ERR_OK)
             {
                 nRet = respond_write_server(Epollfd, pOutValue, pHandleIOData, HashConnidFd, pIoThreadContext);
-                if(nRet != CNV_ERR_OK)
-                {
-                    LOG_SYS_ERROR("respond_write_server error!");
-                }
-                else
+                if(nRet == CNV_ERR_OK)
                 {
                     pIoThreadContext->tMonitorElement.lSvrPackNum++;
                 }
@@ -820,9 +795,6 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
             {
                 LOG_SYS_ERROR("respond_write_client error!");
             }
-            else
-            {
-            }
         }
         else if(pHandleIOData->lAction == NOTICE_CLIENT)    //服务端下发客户端
         {
@@ -833,9 +805,6 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
                 if(nRet != CNV_ERR_OK)
                 {
                     LOG_SYS_ERROR("respond_write_client error!");
-                }
-                else
-                {
                 }
             }
             else
@@ -1069,6 +1038,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         }
         return nRet;
     }
+    pIoThreadContext->tMonitorElement.lRecvLength += nDataReadLen;
     pIoThreadContext->tMonitorElement.lRecvPackNum++;
     pSocketElement->Time = cnv_comm_get_utctime();  //收、发数据后重置时间戳
     LOG_SYS_DEBUG("lDataRemain:%d, read data length:%d", ptClnSockData->lDataRemain, nDataReadLen);
@@ -1353,18 +1323,23 @@ int  io_thread_run(void *pThreadParameter)
         {
             for(int i = 0; i < nCount; i++)
             {
+                if(szEpollEvent[i].events & EPOLLRDHUP)   //对端关闭
+                {
+                    LOG_SYS_DEBUG("peer shutdown.");
+                    remove_client_socket_hashmap(Epollfd, HashConnidFd, szEpollEvent[i].data.ptr);
+                }
                 if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))  //错误
                 {
-                    LOG_SYS_ERROR("epoll event EPOLLHUP! conid:%s, socket:%d", (char *)szEpollEvent[i].data.ptr, szEpollEvent[i].data.fd);
+                    LOG_SYS_ERROR("%s", strerror(errno));
                     remove_client_socket_hashmap(Epollfd, HashConnidFd, szEpollEvent[i].data.ptr);
                 }
                 else if(szEpollEvent[i].events & POLLNVAL)
                 {
-                    LOG_SYS_ERROR("epoll event POLLNVAL! conid:%s, socket:%d", (char *)szEpollEvent[i].data.ptr, szEpollEvent[i].data.fd);
+                    LOG_SYS_ERROR("%s", strerror(errno));
                 }
                 else if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
                 {
-                    LOG_SYS_ERROR("epoll event POLLERR! conid:%s, socket:%d", (char *)szEpollEvent[i].data.ptr, szEpollEvent[i].data.fd);
+                    LOG_SYS_ERROR("%s", strerror(errno));
                     remove_client_socket_hashmap(Epollfd, HashConnidFd, szEpollEvent[i].data.ptr);
                 }
                 else if(szEpollEvent[i].events & EPOLLOUT)  //写事件
@@ -1392,9 +1367,7 @@ int  io_thread_run(void *pThreadParameter)
                     else if(timerfd_monitor == szEpollEvent[i].data.fd)   //进程监控
                     {
                         read(timerfd_monitor, &ulData, sizeof(uint64_t));
-#ifdef _SERVER_MONITER_
                         monitor_iothread(pIoThreadContext);
-#endif
                     }
                     else     //客户端消息
                     {
@@ -1409,22 +1382,16 @@ int  io_thread_run(void *pThreadParameter)
                         }
                     }
                 }
+                else
+                {
+                    LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
+                    remove_client_socket_hashmap(Epollfd, HashConnidFd, szEpollEvent[i].data.ptr);
+                }
             }
         }
-        else if(nCount == 0)   //超时
+        else if(nCount < 0)   //错误
         {
-            LOG_SYS_DEBUG("timeout.");
-            //nRet = iothread_handle_respond_ex(Epollfd, handle_io_msgque, HashAddrFd, HashConnidFd, pIoThreadContext);
-            if(nRet != CNV_ERR_OK)
-            {
-                LOG_SYS_FATAL("iothread_handle_respond  error!");
-            }
-
-            //nRet = cnv_agent_recv_accept_ex(Epollfd, accept_io_msgque, HashConnidFd, pIoThreadContext);
-            if(nRet != CNV_ERR_OK)
-            {
-                LOG_SYS_FATAL("iothread_recv_accept error!");
-            }
+            LOG_SYS_ERROR("%s", strerror(errno));
         }
     }
     return nRet;
@@ -1439,6 +1406,7 @@ void  io_thread_uninit(IO_THREAD_CONTEXT *pIoThreadContexts)
     {
         IO_THREAD_CONTEXT  *pIoThreadContext = &pIoThreadContexts[i];
         int  Epollfd = pIoThreadContext->Epollfd;
+        free_acceptio_fifo(pIoThreadContext->accept_io_msgque);
         cnv_fifo_free(pIoThreadContext->accept_io_msgque);
         free_handleio_unblockqueue(pIoThreadContext->handle_msgque_one);
         cnv_comm_Free(pIoThreadContext->handle_msgque_one);

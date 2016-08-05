@@ -495,25 +495,35 @@ K_BOOL hashmap_earase_callback(void  *pKey, void  *pValue, void  *pContext, K_BO
 int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DATA *pSvrSockData)
 {
     int nSocket = 0;
+    int nRet = -1;
+    int nTimeOut = 50000;  //microsecond
+    int nReconTimes = 1;  //重连次数
 
-    int nRet = netframe_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->lPort, 6000);  //创建连接
+    do
+    {
+        nRet = netframe_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->lPort, nTimeOut); //创建连接
+        nTimeOut *= 2;
+    }
+    while(nRet != CNV_ERR_OK && nReconTimes++ < 5);
+
     if(nRet != CNV_ERR_OK)
     {
-        LOG_SYS_ERROR("netframe_connect failed, service name:%s, ip:%s, port:%d", pSvrSockData->strServiceName, pSvrSockData->strServerIp, pSvrSockData->lPort);
         return -1;
     }
-    LOG_SYS_DEBUG("connect %s:%d succesfully, socket:%d", pSvrSockData->strServerIp, pSvrSockData->lPort, nSocket);
 
-    char *pConnId = NULL;
-    nRet = hash_add_conidfd(nSocket, pSvrSockData, pIoThreadContext, &pConnId);  //客户端hashmap
-    if(nRet != CNV_ERR_OK)
+
+    if(pSvrSockData->isRecvSvrData == K_TRUE)  //需要接受服务端数据
     {
-        LOG_SYS_ERROR("hash_add_conidfd failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->lPort);
-        netframe_close_socket(nSocket);
-        return -1;
+        nRet = hash_add_conidfd(nSocket, pSvrSockData, pIoThreadContext);  //客户端hashmap
+        if(nRet != CNV_ERR_OK)
+        {
+            LOG_SYS_ERROR("hash_add_conidfd failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->lPort);
+            netframe_close_socket(nSocket);
+            return -1;
+        }
     }
 
-    nRet = hash_add_addrsocket(nSocket, pSvrSockData, pIoThreadContext->HashAddrFd, pConnId); //服务端hashmap
+    nRet = hash_add_addrsocket(nSocket, pSvrSockData, pIoThreadContext->HashAddrFd); //服务端hashmap
     if(nRet != CNV_ERR_OK)
     {
         LOG_SYS_ERROR("hash_add_addrsocket failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->lPort);
@@ -701,7 +711,7 @@ int netframe_req_login(int Socket, SERVER_SOCKET_DATA *pSvrSockData)
     return CNV_ERR_OK;
 }
 
-int  hash_add_addrsocket(int Socket, SERVER_SOCKET_DATA *pSvrSockData, void *HashAddrFd, void *pConnId)
+int  hash_add_addrsocket(int Socket, SERVER_SOCKET_DATA *pSvrSockData, void *HashAddrFd)
 {
     char  strPort[10] = "";
 
@@ -723,7 +733,6 @@ int  hash_add_addrsocket(int Socket, SERVER_SOCKET_DATA *pSvrSockData, void *Has
         return  CNV_ERR_MALLOC;
     }
     memset(pSocketElement, 0x00, sizeof(SOCKET_ELEMENT));
-    pSocketElement->pConnId = pConnId;
     pSocketElement->Socket = Socket;
     pSocketElement->Time = cnv_comm_get_utctime();
     SERVER_SOCKET_ELEMENT *pSvrSockElement = &(pSocketElement->uSockElement.tSvrSockElement);
@@ -743,13 +752,10 @@ int  hash_add_addrsocket(int Socket, SERVER_SOCKET_DATA *pSvrSockData, void *Has
     pHashVaule->pValue = (char *)pSocketElement;
     cnv_hashmap_put(HashAddrFd, pKey, pHashVaule, NULL);
 
-    //LOG_SYS_DEBUG("key:%s  socket:%d result:%d", pKey, pSocketElement->Socket,nRet);
-    //LOG_SYS_DEBUG("HashAddrFd.size:%d", ((NAVI_SVC_HASHMAP *)HashAddrFd)->size);
-
     return  CNV_ERR_OK;
 }
 
-int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CONTEXT *pIoThreadContext, char **out_pConnId)
+int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CONTEXT *pIoThreadContext)
 {
     int nRet = CNV_ERR_OK;
     void *pOldValue = NULL;
@@ -817,27 +823,18 @@ int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CON
         }
     }
 
-    *out_pConnId = pKey;
     return nRet;
 }
 
 int  netframe_long_connect(IO_THREAD_CONTEXT *pIoThreadContext, CNV_UNBLOCKING_QUEUE *queServer)
 {
-    if(queServer && get_unblock_queue_count(queServer) > 0)
+    if(queServer && get_unblock_queue_count(queServer) > 0)  //遍历
     {
         struct queue_entry_t  *queuenode = get_unblock_queue_first(queServer);
         while(queuenode)
         {
             SERVER_SOCKET_DATA *pSvrSockData = (SERVER_SOCKET_DATA *)queuenode->data_;
-            int nRet = netframe_long_connect_(pIoThreadContext, pSvrSockData);
-            if(nRet == CNV_ERR_OK)
-            {
-                LOG_SYS_DEBUG("reconnect %s:%d succesfully", pSvrSockData->strServerIp, pSvrSockData->lPort);
-            }
-            else
-            {
-                LOG_SYS_ERROR("reconnect %s:%d failed!", pSvrSockData->strServerIp, pSvrSockData->lPort);
-            }
+            netframe_long_connect_(pIoThreadContext, pSvrSockData);
             queuenode = get_unblock_queue_next(queuenode);
         }
     }
@@ -855,17 +852,7 @@ int netframe_reconnect_server(SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CONTEX
     cnv_comm_StrcatA(strHashKey, strPort);
     remove_server_socket_hashmap(pIoThreadContext->Epollfd, pIoThreadContext->HashAddrFd, strHashKey);
 
-    int nRet = netframe_long_connect_(pIoThreadContext, pSvrSockData);
-    if(nRet == CNV_ERR_OK)
-    {
-        LOG_SYS_ERROR("reconnect %s:%d succesfully", pSvrSockData->strServerIp, pSvrSockData->lPort);
-    }
-    else
-    {
-        LOG_SYS_ERROR("reconnect %s:%d failed!", pSvrSockData->strServerIp, pSvrSockData->lPort);
-    }
-
-    return nRet;
+    return netframe_long_connect_(pIoThreadContext, pSvrSockData);
 }
 
 int  get_current_hashkey(IO_THREAD_CONTEXT  *pIoThreadContext)

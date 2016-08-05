@@ -44,7 +44,6 @@ void cnv_comm_Free(void *pAddr)
     if(pAddr)
     {
         free(pAddr);
-        pAddr = NULL;
     }
 }
 
