@@ -490,11 +490,8 @@ int save_server_remain_data(IO_THREAD_CONTEXT *pIoThreadContext, SOCKET_ELEMENT 
     {
         int nTmpRemain = ptSvrSockElement->lWriteRemain;
         ptSvrSockElement->lWriteRemain = ptSvrSockElement->lWriteRemain + pHandleIOData->lDataLen - nLenAlreadyWrite;
-        if(ptSvrSockElement->pWriteRemain != NULL)
-        {
-            cnv_comm_Free(ptSvrSockElement->pWriteRemain);
-            ptSvrSockElement->pWriteRemain = NULL;
-        }
+        cnv_comm_Free(ptSvrSockElement->pWriteRemain);
+        ptSvrSockElement->pWriteRemain = NULL;
         ptSvrSockElement->pWriteRemain = (char *)malloc(ptSvrSockElement->lWriteRemain);
         assert(ptSvrSockElement->pWriteRemain);
         memcpy(ptSvrSockElement->pWriteRemain, pHandleIOData->pDataSend + (nLenAlreadyWrite - nTmpRemain), ptSvrSockElement->lWriteRemain);
@@ -506,12 +503,11 @@ int save_server_remain_data(IO_THREAD_CONTEXT *pIoThreadContext, SOCKET_ELEMENT 
         assert(pReRemain);
         memcpy(pReRemain, ptSvrSockElement->pWriteRemain + nLenAlreadyWrite, nReRemain);
 
-        ptSvrSockElement->lWriteRemain = ptSvrSockElement->lWriteRemain + pHandleIOData->lDataLen - nLenAlreadyWrite;
-        if(ptSvrSockElement->pWriteRemain != NULL)
-        {
-            cnv_comm_Free(ptSvrSockElement->pWriteRemain);
-            ptSvrSockElement->pWriteRemain = NULL;
-        }
+        ptSvrSockElement->lWriteRemain = nReRemain + pHandleIOData->lDataLen;
+        cnv_comm_Free(ptSvrSockElement->pWriteRemain);
+        ptSvrSockElement->pWriteRemain = NULL;
+        ptSvrSockElement->pWriteRemain = (char *)malloc(ptSvrSockElement->lWriteRemain);
+        assert(ptSvrSockElement->pWriteRemain);
         memcpy(ptSvrSockElement->pWriteRemain, pReRemain, nReRemain);
         memcpy(ptSvrSockElement->pWriteRemain + nReRemain, pHandleIOData->pDataSend, pHandleIOData->lDataLen);
         cnv_comm_Free(pReRemain);
@@ -524,21 +520,16 @@ int sendmsg_to_server(SOCKET_ELEMENT *pSocketElement, HANDLE_TO_IO_DATA *pHandle
 {
     if(pSocketElement->uSockElement.tSvrSockElement.lWriteRemain == 0)  //只写本次数据
     {
-        struct iovec tIovecWriteData = { 0 };
-        tIovecWriteData.iov_base = pHandleIOData->pDataSend;
-        tIovecWriteData.iov_len = pHandleIOData->lDataLen;
-        pSocketElement->uSockElement.tSvrSockElement.msg.msg_iov = &tIovecWriteData;
+        pSocketElement->uSockElement.tSvrSockElement.msg.msg_iov[0].iov_base = pHandleIOData->pDataSend;
+        pSocketElement->uSockElement.tSvrSockElement.msg.msg_iov[0].iov_len = pHandleIOData->lDataLen;
         pSocketElement->uSockElement.tSvrSockElement.msg.msg_iovlen = 1;
     }
     else if(pSocketElement->uSockElement.tSvrSockElement.lWriteRemain > 0)  //还有未写完的数据
     {
-        struct iovec szIovecWriteData[2];
-        bzero(szIovecWriteData, sizeof(struct iovec) * 2);
-        szIovecWriteData[0].iov_base = pSocketElement->uSockElement.tClnSockElement.pWriteRemain;
-        szIovecWriteData[0].iov_len = pSocketElement->uSockElement.tClnSockElement.lWriteRemain;
-        szIovecWriteData[1].iov_base = pHandleIOData->pDataSend;
-        szIovecWriteData[1].iov_len = pHandleIOData->lDataLen;
-        pSocketElement->uSockElement.tSvrSockElement.msg.msg_iov = szIovecWriteData;
+        pSocketElement->uSockElement.tSvrSockElement.msg.msg_iov[0].iov_base = pSocketElement->uSockElement.tSvrSockElement.pWriteRemain;
+        pSocketElement->uSockElement.tSvrSockElement.msg.msg_iov[0].iov_len = pSocketElement->uSockElement.tSvrSockElement.lWriteRemain;
+        pSocketElement->uSockElement.tSvrSockElement.msg.msg_iov[1].iov_base = pHandleIOData->pDataSend;
+        pSocketElement->uSockElement.tSvrSockElement.msg.msg_iov[1].iov_len = pHandleIOData->lDataLen;
         pSocketElement->uSockElement.tSvrSockElement.msg.msg_iovlen = 2;
     }
 
