@@ -510,8 +510,7 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
     {
         return -1;
     }
-
-
+	
     if(pSvrSockData->isRecvSvrData == K_TRUE)  //需要接收服务端数据
     {
         nRet = hash_add_conidfd(nSocket, pSvrSockData, pIoThreadContext);  //客户端hashmap
