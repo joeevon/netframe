@@ -181,10 +181,23 @@ void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleCon
     K_BOOL bIsWakeIO = K_FALSE;
     int nNumOfPostMsg = get_unblock_queue_count(&pHandleContext->queuerespond);
     LOG_SYS_DEBUG("nNumOfPostMsg = %d", nNumOfPostMsg);
+
+    CNV_BLOCKING_QUEUE *handle_io_msgque = pIOHanldeData->handle_io_msgque;
+    int handle_io_eventfd = pIOHanldeData->handle_io_eventfd;
+    if(get_unblock_queue_count(pHandleContext->queDistribute) > 0)
+    {
+        char *pThreadIndex = (char *)poll_unblock_queue_head(pHandleContext->queDistribute);
+        push_unblock_queue_tail(pHandleContext->queDistribute, pThreadIndex);    //此处取出后重新插入,达到分配效果
+        int lThreadIndex = atoi(pThreadIndex);
+        LOG_SYS_DEBUG("handle thread %d select io thread %d", pHandleContext->lthreadindex, lThreadIndex);
+        handle_io_msgque = pHandleContext->szIoContext[lThreadIndex - 1].handle_io_msgque;
+        handle_io_eventfd = pHandleContext->szIoContext[lThreadIndex - 1].handle_io_eventfd;
+    }
+
     while(nNumOfPostMsg--)    // handle线程单独用的队列,无需加锁
     {
         void *pPostData = poll_unblock_queue_head(&pHandleContext->queuerespond);
-        nRet = push_block_queue_tail(pIOHanldeData->handle_io_msgque, pPostData, 1);  //队列满了把数据丢掉,以免内存泄露
+        nRet = push_block_queue_tail(handle_io_msgque, pPostData, 1);  //队列满了把数据丢掉,以免内存泄露
         if(nRet == false)
         {
             HANDLE_TO_IO_DATA *pHandleIOData = (HANDLE_TO_IO_DATA *)pPostData;
@@ -197,7 +210,7 @@ void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleCon
 
     if(bIsWakeIO)
     {
-        nRet = write(pIOHanldeData->handle_io_eventfd, &ulWakeup, sizeof(ulWakeup));  //handle唤醒io
+        nRet = write(handle_io_eventfd, &ulWakeup, sizeof(ulWakeup));  //handle唤醒io
         if(nRet != sizeof(ulWakeup))
         {
             LOG_SYS_ERROR("handle wake io failed.");
@@ -219,6 +232,11 @@ int netframe_init_handle(HANDLE_THREAD_ITEM *pTheadparam)
 {
     int nRet = CNV_ERR_OK;
     HANDLE_THREAD_CONTEXT *pHandleContext = pTheadparam->pHandleContext;
+
+    //负载解析
+    cnv_parse_distribution(pTheadparam->strAlgorithm, pTheadparam->strDistribution, pHandleContext->queDistribute);
+    LOG_SYS_DEBUG("handle thread : %s, distribution: %s", pTheadparam->strThreadName, pTheadparam->strDistribution);
+    iterator_unblock_queuqe(pHandleContext->queDistribute, printDistribution, (void *)0);
 
     //监听io写handle
     nRet = netframe_setblockopt(pHandleContext->io_handle_eventfd, K_FALSE);
@@ -338,28 +356,16 @@ int  handle_thread_run(void *pThreadParameter)
         {
             for(i = 0; i < nCount; i++)
             {
-                if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))   //错误
+                if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))      //读事件
                 {
-                    LOG_SYS_ERROR("%s", strerror(errno));
-                }
-                else if(szEpollEvent[i].events & POLLNVAL)
-                {
-                    LOG_SYS_ERROR("%s", strerror(errno));
-                }
-                else if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
-                {
-                    LOG_SYS_ERROR("%s", strerror(errno));
-                }
-                else if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))     //读事件
-                {
-                    if(szEpollEvent[i].data.fd == EventfdIo)    //io唤醒
+                    if(szEpollEvent[i].data.fd == EventfdIo)     //io唤醒
                     {
                         handlethread_handle_iomsg(EventfdIo, pHandleContext);
                     }
                     else   //定时事件
                     {
                         void *pOutValue = NULL;
-                        if(cnv_hashmap_get(pHandleContext->HashTimerTask, szEpollEvent[i].data.ptr, &pOutValue) == K_SUCCEED)   //有定时服务
+                        if(cnv_hashmap_get(pHandleContext->HashTimerTask, szEpollEvent[i].data.ptr, &pOutValue) == K_SUCCEED)    //有定时服务
                         {
                             HASHMAP_VALUE *pHashValue = (HASHMAP_VALUE *)pOutValue;
                             TIMER_TASK_STRUCT *ptCbFunctionStr = (TIMER_TASK_STRUCT *)pHashValue->pValue;
@@ -374,6 +380,18 @@ int  handle_thread_run(void *pThreadParameter)
                             }
                         }
                     }
+                }
+                else if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))   //错误
+                {
+                    LOG_SYS_ERROR("%s", strerror(errno));
+                }
+                else if(szEpollEvent[i].events & POLLNVAL)
+                {
+                    LOG_SYS_ERROR("%s", strerror(errno));
+                }
+                else if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
+                {
+                    LOG_SYS_ERROR("%s", strerror(errno));
                 }
                 else
                 {
@@ -390,6 +408,34 @@ int  handle_thread_run(void *pThreadParameter)
     return nRet;
 }
 
+int handle_set_iothread_context(IO_THREAD_CONTEXT *pIoThreadContexts, HANDLE_THREAD_CONTEXT *pHandleContexts)
+{
+    int i;
+    for(i = 0; i < g_params.tConfigHandle.lNumberOfThread; i++)
+    {
+        HANDLE_THREAD_CONTEXT *pHandleContext = &pHandleContexts[i];
+        pHandleContext->szIoContext = pIoThreadContexts;
+
+        if(get_unblock_queue_count(pHandleContext->queDistribute) > 0)
+        {
+            struct queue_entry_t *queuenode = get_unblock_queue_first(pHandleContext->queDistribute);
+            while(queuenode)
+            {
+                int nThreadIndex = atoi((char *)queuenode->data_);
+                if(&pHandleContext->szIoContext[nThreadIndex - 1] == NULL)
+                {
+                    LOG_APP_ERROR("handle_set_iothread_context error.");
+                    return -1;
+                }
+
+                queuenode = get_unblock_queue_next(queuenode);
+            }
+        }
+    }
+
+    return 0;
+}
+
 void handle_thread_uninit(HANDLE_THREAD_CONTEXT *pHandleContexts)
 {
     int  i;
@@ -403,6 +449,8 @@ void handle_thread_uninit(HANDLE_THREAD_CONTEXT *pHandleContexts)
         free_iohandle_lockfreequeue(&(pHandleContext->io_handle_msgque));
         lockfree_queue_uninit(&(pHandleContext->io_handle_msgque));
         free_handleio_unblockqueue(&(pHandleContext->queuerespond));  //  写给IO的队列
+        free_unblock_queue(pHandleContext->queDistribute);
+        cnv_comm_Free(pHandleContext->queDistribute);
     }
 }
 
@@ -420,6 +468,14 @@ int  handle_thread_init(HANDLE_THREAD_ITEM *pConfigHandleItem, HANDLE_THREAD_CON
     {
         LOG_SYS_ERROR("init_handle_params failed.");
     }
+
+    pHandleContext->queDistribute = (CNV_UNBLOCKING_QUEUE *)cnv_comm_Malloc(sizeof(CNV_UNBLOCKING_QUEUE));
+    if(!pHandleContext->queDistribute)
+    {
+        return CNV_ERR_MALLOC;
+    }
+    initiate_unblock_queue(pHandleContext->queDistribute, 30);      //负载队列
+
     HANDLE_PARAMS *pHandleParams = (HANDLE_PARAMS *)pHandleContext->pHandleParam;
     pHandleContext->queParamFrames = &pHandleParams->queParamFrameUse;
 

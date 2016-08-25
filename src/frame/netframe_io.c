@@ -862,7 +862,7 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
         memset(pSocketElement, 0x00, sizeof(SOCKET_ELEMENT));
         pSocketElement->Socket = AcceptIOData.fd;
         pSocketElement->Time = cnv_comm_get_utctime();
-        if(strcmp(AcceptIOData.strTransmission, "UDP"))
+        if(strcmp(AcceptIOData.strTransmission, "UDP") != 0)  //udp协议不清理客户端
         {
             pSocketElement->bIsToclear = true;
         }
@@ -1098,13 +1098,12 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
             pHandleContext = pIoThreadContext->szHandleContext[pIoThreadContext->szIoRespHandle[nDistributeValue % g_params.tConfigHandle.lNumberOfThread]];
         }
 
-        nRet = lockfree_queue_enqueue(&(pHandleContext->io_handle_msgque), pIOHanldeData, 1);   //队列满了把数据丢掉,以免内存泄露;同时退出while,以免线程堵死
+        nRet = lockfree_queue_enqueue(&(pHandleContext->io_handle_msgque), pIOHanldeData, 1);   //队列满了把数据丢掉,以免内存泄露
         if(nRet == false)
         {
             LOG_SYS_ERROR("queue is full!");
             cnv_comm_Free(pPacket);
             cnv_comm_Free(pIOHanldeData);
-            //ptClnSockData->lDataRemain = 0;   //此处因队列已满,把未解析完的数据丢弃;也可不丢弃,继续解析
             pIoThreadContext->tMonitorElement.lSvrFailedNum++;
             continue;
         }
@@ -1286,12 +1285,48 @@ int  io_thread_run(void *pThreadParameter)
         {
             for(int i = 0; i < nCount; i++)
             {
-                if(szEpollEvent[i].events & EPOLLRDHUP)   //对端关闭
+                if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))   //读事件
+                {
+                    if(EventfdAccept == szEpollEvent[i].data.fd)   //accept唤醒
+                    {
+                        iothread_recv_accept(Epollfd, szEpollEvent[i].data.fd, accept_io_msgque, HashConnidFd, pIoThreadContext);
+                    }
+                    else if(EventfdHandle == szEpollEvent[i].data.fd)   //handle唤醒
+                    {
+                        iothread_handle_respond(Epollfd, szEpollEvent[i].data.fd, handle_io_msgque, HashAddrFd, HashConnidFd, pIoThreadContext);
+                    }
+                    else if(timerfd_monitor == szEpollEvent[i].data.fd)     //进程监控
+                    {
+                        read(timerfd_monitor, &ulData, sizeof(uint64_t));
+                        monitor_iothread(pIoThreadContext);
+                    }
+                    else if(timerfd_hearbeat == szEpollEvent[i].data.fd)   //心跳
+                    {
+                        netframe_heart_beat(szEpollEvent[i].data.fd, pIoThreadContext);
+                    }
+                    else if(timerfd_clearsocket == szEpollEvent[i].data.fd)   //socket清理
+                    {
+                        netframe_socket_clear(Epollfd, szEpollEvent[i].data.fd, HashConnidFd);
+                    }
+                    else     //客户端消息
+                    {
+                        nRet = iothread_handle_read(Epollfd, szEpollEvent[i].data.ptr, HashConnidFd, pIoThreadContext);
+                        if(nRet != CNV_ERR_OK)
+                        {
+                            if(nRet == CNV_ERR_HASHMAP_GET)
+                            {
+                                netframe_delete_event(Epollfd, szEpollEvent[i].data.fd);
+                                netframe_close_socket(szEpollEvent[i].data.fd);
+                            }
+                        }
+                    }
+                }
+                else if(szEpollEvent[i].events & EPOLLRDHUP)   //对端关闭
                 {
                     LOG_SYS_DEBUG("peer shutdown.");
                     remove_client_socket_hashmap(Epollfd, HashConnidFd, szEpollEvent[i].data.ptr);
                 }
-                if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))  //错误
+                else if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))  //错误
                 {
                     LOG_SYS_ERROR("%s", strerror(errno));
                     remove_client_socket_hashmap(Epollfd, HashConnidFd, szEpollEvent[i].data.ptr);
@@ -1309,42 +1344,6 @@ int  io_thread_run(void *pThreadParameter)
                 {
                     iothread_handle_write(Epollfd, szEpollEvent[i].data.ptr, HashConnidFd, pIoThreadContext);
                 }
-                else if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))  //读事件
-                {
-                    if(EventfdAccept == szEpollEvent[i].data.fd)  //accept唤醒
-                    {
-                        iothread_recv_accept(Epollfd, szEpollEvent[i].data.fd, accept_io_msgque, HashConnidFd, pIoThreadContext);
-                    }
-                    else if(EventfdHandle == szEpollEvent[i].data.fd)  //handle唤醒
-                    {
-                        iothread_handle_respond(Epollfd, szEpollEvent[i].data.fd, handle_io_msgque, HashAddrFd, HashConnidFd, pIoThreadContext);
-                    }
-                    else if(timerfd_hearbeat == szEpollEvent[i].data.fd)  //心跳
-                    {
-                        netframe_heart_beat(szEpollEvent[i].data.fd, pIoThreadContext);
-                    }
-                    else if(timerfd_clearsocket == szEpollEvent[i].data.fd)  //socket清理
-                    {
-                        netframe_socket_clear(Epollfd, szEpollEvent[i].data.fd, HashConnidFd);
-                    }
-                    else if(timerfd_monitor == szEpollEvent[i].data.fd)   //进程监控
-                    {
-                        read(timerfd_monitor, &ulData, sizeof(uint64_t));
-                        monitor_iothread(pIoThreadContext);
-                    }
-                    else     //客户端消息
-                    {
-                        nRet = iothread_handle_read(Epollfd, szEpollEvent[i].data.ptr, HashConnidFd, pIoThreadContext);
-                        if(nRet != CNV_ERR_OK)
-                        {
-                            if(nRet == CNV_ERR_HASHMAP_GET)
-                            {
-                                netframe_delete_event(Epollfd, szEpollEvent[i].data.fd);
-                                netframe_close_socket(szEpollEvent[i].data.fd);
-                            }
-                        }
-                    }
-                }
                 else
                 {
                     LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
@@ -1357,6 +1356,7 @@ int  io_thread_run(void *pThreadParameter)
             LOG_SYS_ERROR("%s", strerror(errno));
         }
     }
+
     return nRet;
 }
 

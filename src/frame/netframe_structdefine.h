@@ -49,6 +49,7 @@ extern "C"
     enumDISTRIBUTE_TYPE;
 
     // HANDLE CONTEXT
+    struct __IO_THREAD_CONTEXT;
     typedef struct  __HANDLE_THREAD_CONTEXT
     {
         int  lthreadindex;
@@ -56,6 +57,8 @@ extern "C"
         int  Epollfd;
         int  io_handle_eventfd;  //io唤醒handle
         void *HashTimerTask;    //key:taskname   valude:cb function
+        struct __IO_THREAD_CONTEXT *szIoContext;
+        CNV_UNBLOCKING_QUEUE *queDistribute;    //存放负载的线程
         CNV_UNBLOCKING_QUEUE *queParamFrames;   //框架handle使用的参数,有业务初始化好传进,所以由业务释放
         LOCKFREE_QUEUE  io_handle_msgque;
         CNV_UNBLOCKING_QUEUE  queuerespond;   //返回IO的数据
@@ -67,6 +70,8 @@ extern "C"
     {
         char  strThreadName[DEFAULT_ARRAY_SIZE];
         int  lThreadIndex;     //开启线时自定义的序号
+        char  strDistribution[DEFAULT_ARRAY_SIZE];
+        char  strAlgorithm[DEFAULT_ARRAY_SIZE];
         pthread_t  ulThreadId;    //线程ID
         void   *ThreadHandle;
         HANDLE_THREAD_CONTEXT  *pHandleContext;  //线程环境
@@ -106,7 +111,7 @@ extern "C"
         CNV_UNBLOCKING_QUEUE  *handle_msgque_two;    //handle -> io  self
         struct epoll_event  *EpollEvent;
         HANDLE_THREAD_CONTEXT  *szHandleContext[MAX_HANDLE_THREAD];
-		pfnCNV_MONITOR_CALLBACK  pfncnv_monitor_callback;
+        pfnCNV_MONITOR_CALLBACK  pfncnv_monitor_callback;
         MONITOR_ELEMENT tMonitorElement;
     } IO_THREAD_CONTEXT;
 
@@ -126,8 +131,8 @@ extern "C"
     // IO  CONFIG
     typedef  struct  __NETFRAME_CONFIG_IO
     {
-		int lNumberOfThread;
-		int lHandleIoMsgSize;
+        int lNumberOfThread;
+        int lHandleIoMsgSize;
         IO_THREAD_ITEM szConfigIOItem[MAX_IO_THREAD];
     } NETFRAME_CONFIG_IO;
 

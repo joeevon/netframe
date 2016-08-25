@@ -170,6 +170,12 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
     }
     LOG_SYS_DEBUG("io_thread_start ok.");
 
+    nRet = handle_set_iothread_context(szIoThreadContexts, szHandleContexts);
+    if(nRet != CNV_ERR_OK)
+    {
+        return nRet;
+    }
+
     //开启AUXILIARY线程
     nRet = auxiliary_thread_start(szIoThreadContexts, szAuxiliaryContext);
     if(nRet != CNV_ERR_OK)

@@ -75,12 +75,18 @@
     <handle_thread>
         <handle>
             <name>H1</name>
+            <distribution>T1,T2,T3</distribution>
+            <algorithm>1:1:1</algorithm>
         </handle> 
         <handle>
             <name>H2</name>
+            <distribution>T1,T2,T3</distribution>
+            <algorithm>1:1:1</algorithm>
         </handle> 
         <handle>
             <name>H3</name>
+            <distribution>T1,T2,T3</distribution>
+            <algorithm>1:1:1</algorithm>
         </handle> 
     </handle_thread>
 	<auxiliary_thread>
@@ -112,6 +118,6 @@
 			<intervalsec>3</intervalsec>
 			<intervalnsec>0</intervalnsec>
 	</monitor>
-	<handleiomsgsize>100000</handleiomsgsize>
-	<iohandlemsgsize>100000</iohandlemsgsize>
+	<handleiomsgsize>10000</handleiomsgsize>
+	<iohandlemsgsize>10000</iohandlemsgsize>
 </root>

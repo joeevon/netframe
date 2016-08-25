@@ -158,8 +158,6 @@ int  accept_init_server(ACCEPT_THREAD_CONTEXT *pAcceptContext, ACCEPT_THREAD_ITE
         nRet = netframe_init_udpserver(&Socket, &tServAddr);    //创建socket
         if(nRet != CNV_ERR_OK)
         {
-            LOG_SYS_FATAL("netframe_init_udpserver failed!");
-            netframe_close_socket(Socket);
             return nRet;
         }
         pAcceptContext->UdpSocket = Socket;
@@ -348,9 +346,6 @@ int  accept_thread_run(void *pThreadParameter)
                 {
                     LOG_SYS_ERROR("%s", strerror(errno));
                 }
-                if(szEpollEvent[i].events & EPOLLOUT)
-                {
-                }
                 if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))
                 {
                     lClientfd = accept4(szEpollEvent[i].data.fd, (struct sockaddr *)&tClientAddr, &lClientLen, SOCK_NONBLOCK | SOCK_CLOEXEC);
@@ -402,10 +397,10 @@ int  accept_thread_run(void *pThreadParameter)
                         continue;
                     }
                 }
-				else
-				{
-					LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
-				}
+                else
+                {
+                    LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
+                }
             }
         }
         else if(nCount < 0)

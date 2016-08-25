@@ -243,6 +243,14 @@ int netframe_init_config()
                         {
                             snprintf(g_params.tConfigHandle.szConfigHandleItem[lIndex].strThreadName, sizeof(g_params.tConfigHandle.szConfigHandleItem[lIndex].strThreadName) - 1, "%s", pItemVaule);
                         }
+                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"distribution"))
+                        {
+                            snprintf(g_params.tConfigHandle.szConfigHandleItem[lIndex].strDistribution, sizeof(g_params.tConfigHandle.szConfigHandleItem[lIndex].strDistribution) - 1, "%s", pItemVaule);
+                        }
+                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"algorithm"))
+                        {
+                            snprintf(g_params.tConfigHandle.szConfigHandleItem[lIndex].strAlgorithm, sizeof(g_params.tConfigHandle.szConfigHandleItem[lIndex].strAlgorithm) - 1, "%s", pItemVaule);
+                        }
 
                         xmlFree(pItemVaule);
                         ptNodeItem = ptNodeItem->next;
@@ -510,7 +518,7 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
     {
         return -1;
     }
-	
+
     if(pSvrSockData->isRecvSvrData == K_TRUE)  //需要接收服务端数据
     {
         nRet = hash_add_conidfd(nSocket, pSvrSockData, pIoThreadContext);  //客户端hashmap

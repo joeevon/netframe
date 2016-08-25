@@ -124,7 +124,7 @@ int cnv_hashmap_init(void * *out_pHashmap,
     }
 
     map = cnv_comm_Malloc(sizeof(NAVI_SVC_HASHMAP));
-    LOG_SYS_DEBUG(">>>>>>>>>malloc: %p.", map);
+    //LOG_SYS_DEBUG(">>>>>>>>>malloc: %p.", map);
     if(map == K_NULL)
     {
         return CNV_ERR_MALLOC;
@@ -141,7 +141,7 @@ int cnv_hashmap_init(void * *out_pHashmap,
 
     lsize = sizeof(NAVI_SVC_HASHMAP_ENTRY *) * map->bucketCount;
     map->buckets = cnv_comm_Malloc(lsize);
-    LOG_SYS_DEBUG(">>>>>>>>>malloc: %p.", map->buckets);
+    //LOG_SYS_DEBUG(">>>>>>>>>malloc: %p.", map->buckets);
     if(map->buckets == K_NULL)
     {
         cnv_comm_Free(map);

@@ -102,12 +102,12 @@ int netframe_init_udpserver(int *pSocket, struct sockaddr_in *pSockAddr)
     nRet = bind(fd, (struct sockaddr *)SockAddr, sizeof(struct sockaddr_in));
     if(nRet < 0)
     {
+        LOG_SYS_ERROR("%s", strerror(errno));
         netframe_close_socket(fd);
         return AGENT_NET_BIND_FAILED;
     }
 
     *pSocket = fd;
-
     return  CNV_ERR_OK;
 }
 
