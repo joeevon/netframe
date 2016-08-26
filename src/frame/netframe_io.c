@@ -727,11 +727,20 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
                 if(ptSvrSockData)
                 {
                     nRet = respond_write_server_again(ptSvrSockData, pHandleIOData, pIoThreadContext);  //重连,再写一次
-                    if(nRet != CNV_ERR_OK)
+                    if(nRet == CNV_ERR_OK)
+                    {
+                        pIoThreadContext->tMonitorElement.lSvrPackNum++;
+                    }
+                    else
                     {
                         nRet = respond_write_next_server(ptSvrSockData, pHandleIOData, pIoThreadContext);  //本连接失败,发送到同类服务器
-                        if(nRet != CNV_ERR_OK)
+                        if(nRet == CNV_ERR_OK)
                         {
+                            pIoThreadContext->tMonitorElement.lSvrPackNum++;
+                        }
+                        else
+                        {
+                            pIoThreadContext->tMonitorElement.lSvrFailedNum++;
                             on_write_server_failed(pHandleIOData, pIoThreadContext);  //发送失败
                         }
                     }
@@ -1028,14 +1037,24 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
             {
                 memcpy(ptClnSockData->pDataBuffer, ptClnSockData->pMovePointer, ptClnSockData->lDataRemain);
             }
-            else if(nRet == CNV_PARSE_ERROR)   //解析错误,数据清空
-            {
-                memset(ptClnSockData->pDataBuffer, 0, g_params.nMaxBufferSize);
-                ptClnSockData->lDataRemain = 0;
-            }
             else if(nRet == CNV_PARSE_SHUTDOWN)    //关闭客户端
             {
                 remove_client_socket_hashmap(Epollfd, HashConnidFd, pConnId);
+            }
+            else if(nRet == CNV_PARSE_MOVE)     //数据偏移
+            {
+                ptClnSockData->lDataRemain -= nPacketSize;      //总数据长度减去一个包的数据大小
+                if(ptClnSockData->lDataRemain == 0 && pAuxiliary)     //解析完了才把pAuxiliary内存释放
+                {
+                    cnv_comm_Free(pAuxiliary);
+                    pAuxiliary = NULL;
+                }
+                continue;
+            }
+            else if(nRet == CNV_PARSE_ERROR)    //解析错误,数据清空
+            {
+                memset(ptClnSockData->pDataBuffer, 0, g_params.nMaxBufferSize);
+                ptClnSockData->lDataRemain = 0;
             }
 
             if(pAuxiliary)
@@ -1063,11 +1082,6 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         {
             cnv_comm_Free(pAuxiliary);
             pAuxiliary = NULL;
-        }
-
-        if(!pPacket)    //业务只需偏移数据,没有返回包
-        {
-            continue;
         }
         pIoThreadContext->tMonitorElement.lParsePackNum++;
 
