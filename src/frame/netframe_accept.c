@@ -64,15 +64,15 @@ int  accept_select_io_thread(ACCEPT_THREAD_ITEM *pAcceptItem, IO_THREAD_CONTEXT 
 int  accept_set_iodata(int ClientFd, ACCEPT_THREAD_ITEM *pAcceptItem, struct sockaddr_in *ClientAddr, ACCEPT_TO_IO_DATA *AcceptIOData)
 {
     AcceptIOData->fd = ClientFd;  // 客户端fd
-    if(pAcceptItem->uMapType == 2)   //用客户端的ip和端口做映射
+    if(pAcceptItem->uMapType == 1)   //用客户端的ip和端口做映射
     {
-        AcceptIOData->uMapType = 2;
+        AcceptIOData->uMapType = 1;
         memcpy(AcceptIOData->strClientIp, inet_ntoa(ClientAddr->sin_addr), sizeof(AcceptIOData->strClientIp) - 1);
         AcceptIOData->uClientPort = ntohs(ClientAddr->sin_port);
     }
     else   //默认用连接ID做映射
     {
-        AcceptIOData->uMapType = 1;
+        AcceptIOData->uMapType = 0;
     }
     snprintf(AcceptIOData->strTransmission, sizeof(AcceptIOData->strTransmission) - 1, "%s", pAcceptItem->strTransmission);   // 通信协议
     snprintf(AcceptIOData->strProtocol, sizeof(AcceptIOData->strProtocol) - 1, "%s", pAcceptItem->tCallback.strProtocol);     // 服务协议

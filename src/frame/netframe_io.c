@@ -30,6 +30,7 @@
 #include <poll.h>
 #include <unistd.h>
 #include <assert.h>
+#include <arpa/inet.h>
 
 int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle_io_msgque, void *HashAddrFd, void *HashConnidFd, IO_THREAD_CONTEXT *pIoThreadContext);
 
@@ -886,6 +887,8 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
         pSocketElement->uSockElement.tClnSockElement.msg.msg_namelen = sizeof(struct sockaddr_in);
         pSocketElement->uSockElement.tClnSockElement.msg.msg_iov = &(pSocketElement->uSockElement.tClnSockElement.tIovecClnData);
         pSocketElement->uSockElement.tClnSockElement.msg.msg_iovlen = 1;
+        pSocketElement->uSockElement.tClnSockElement.msg.msg_control = pSocketElement->uSockElement.tClnSockElement.strControl;
+        pSocketElement->uSockElement.tClnSockElement.msg.msg_controllen = sizeof(pSocketElement->uSockElement.tClnSockElement.strControl);
         pSocketElement->uSockElement.tClnSockElement.pfncnv_parse_protocol = AcceptIOData.pfncnv_parse_protocol;
         pSocketElement->uSockElement.tClnSockElement.pfncnv_handle_business = AcceptIOData.pfncnv_handle_business;
 
@@ -897,7 +900,7 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
         }
         bzero(pKey, 33);
 
-        if(AcceptIOData.uMapType == 1)   //用连接ID做映射
+        if(AcceptIOData.uMapType == 0)   //用连接ID做映射
         {
             int ConnId = netframe_get_hashkey(HashConnidFd, &(pIoThreadContext->SeedOfKey));
             snprintf(pKey, 32, "%d", ConnId);
@@ -1010,6 +1013,18 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         }
         return nRet;
     }
+
+    char strClientIp[32] = { 0 };
+    struct cmsghdr *cmptr = NULL;
+    for(cmptr = CMSG_FIRSTHDR(pmsg); cmptr; cmptr = CMSG_NXTHDR(pmsg, cmptr))
+    {
+        if((cmptr->cmsg_level == IPPROTO_IP) && (cmptr->cmsg_type == IP_PKTINFO))
+        {
+            LOG_SYS_DEBUG("%s,%d\n", inet_ntoa(((struct in_pktinfo *)CMSG_DATA(cmptr))->ipi_spec_dst), ((struct in_pktinfo *)CMSG_DATA(cmptr))->ipi_ifindex);
+        }
+        memcpy(strClientIp, inet_ntoa(((struct in_pktinfo *)CMSG_DATA(cmptr))->ipi_spec_dst), sizeof(strClientIp) - 1);
+    }
+
     pIoThreadContext->tMonitorElement.lRecvLength += nDataReadLen;
     pIoThreadContext->tMonitorElement.lRecvPackNum++;
     pSocketElement->Time = cnv_comm_get_utctime();  //收、发数据后重置时间戳
@@ -1092,7 +1107,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
             return CNV_ERR_MALLOC;
         }
         pIOHanldeData->lConnectID = atoi((char *)pConnId);
-        memcpy(pIOHanldeData->strServIp, pSocketElement->uSockElement.tClnSockElement.tSvrSockData.strServerIp, sizeof(pIOHanldeData->strServIp) - 1);
+        memcpy(pIOHanldeData->strServIp, strClientIp, sizeof(pIOHanldeData->strServIp) - 1);
         pIOHanldeData->ulPort = pSocketElement->uSockElement.tClnSockElement.tSvrSockData.lPort;
         pIOHanldeData->lDataLen = nPacketSize;
         pIOHanldeData->handle_io_eventfd = pIoThreadContext->handle_io_eventfd;
@@ -1133,7 +1148,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
     return  CNV_ERR_OK;
 }
 
-int  io_set_handle_contexts(IO_THREAD_ITEM  *pConfigIOItem, HANDLE_THREAD_CONTEXT *pHandleContexts, IO_THREAD_CONTEXT *pIoThreadContext)
+int  io_set_handle_contexts(IO_THREAD_ITEM   *pConfigIOItem, HANDLE_THREAD_CONTEXT *pHandleContexts, IO_THREAD_CONTEXT *pIoThreadContext)
 {
     int nThreadIndex = 0;
     int nRealHandleThread = 0;  //handle线程变量的排序
@@ -1159,7 +1174,7 @@ int  io_set_handle_contexts(IO_THREAD_ITEM  *pConfigIOItem, HANDLE_THREAD_CONTEX
 }
 
 // 单个线程内部初始化
-int netframe_init_io(IO_THREAD_ITEM  *pTheadparam)
+int netframe_init_io(IO_THREAD_ITEM   *pTheadparam)
 {
     int  nRet = CNV_ERR_OK;
     IO_THREAD_CONTEXT *pIoThreadContext = pTheadparam->pIoThreadContext;
@@ -1407,7 +1422,7 @@ void  io_thread_uninit(IO_THREAD_CONTEXT *pIoThreadContexts)
 }
 
 //功能:io线程初始化
-int  io_thread_init(IO_THREAD_ITEM  *pConfigIOItem, HANDLE_THREAD_CONTEXT *pHandleContexts, IO_THREAD_CONTEXT *pIoThreadContext)
+int  io_thread_init(IO_THREAD_ITEM   *pConfigIOItem, HANDLE_THREAD_CONTEXT *pHandleContexts, IO_THREAD_CONTEXT *pIoThreadContext)
 {
     int  nRet = CNV_ERR_OK;
     nRet = io_set_handle_contexts(pConfigIOItem, pHandleContexts, pIoThreadContext);

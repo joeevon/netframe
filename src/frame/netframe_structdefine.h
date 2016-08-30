@@ -253,6 +253,7 @@ extern "C"
         struct sockaddr_in tClientAddr;
         struct iovec tIovecClnData;
         struct msghdr msg;       //数据内容
+		char strControl[CMSG_SPACE(sizeof(struct in_pktinfo))];
         SERVER_SOCKET_DATA tSvrSockData;
         CLIENT_SOCKET_DATA  SocketData;  //相关读数据
         pfnCNV_PARSE_PROTOCOL  pfncnv_parse_protocol;   //协议解析回调函数

@@ -99,6 +99,9 @@ int netframe_init_udpserver(int *pSocket, struct sockaddr_in *pSockAddr)
         return AGENT_NET_CREATE_SOCKET_FAILED;
     }
 
+    int optval = 1;
+    setsockopt(fd, IPPROTO_IP, IP_PKTINFO, &optval, sizeof(optval));
+
     nRet = bind(fd, (struct sockaddr *)SockAddr, sizeof(struct sockaddr_in));
     if(nRet < 0)
     {
