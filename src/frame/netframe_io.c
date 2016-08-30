@@ -1014,16 +1014,10 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         return nRet;
     }
 
+    struct sockaddr_in *ptClientAddr = (struct sockaddr_in *)(pmsg->msg_name);
+    LOG_SYS_DEBUG("peer ip:%s", inet_ntoa(ptClientAddr->sin_addr));
     char strClientIp[32] = { 0 };
-    struct cmsghdr *cmptr = NULL;
-    for(cmptr = CMSG_FIRSTHDR(pmsg); cmptr; cmptr = CMSG_NXTHDR(pmsg, cmptr))
-    {
-        if((cmptr->cmsg_level == IPPROTO_IP) && (cmptr->cmsg_type == IP_PKTINFO))
-        {
-            LOG_SYS_DEBUG("%s,%d\n", inet_ntoa(((struct in_pktinfo *)CMSG_DATA(cmptr))->ipi_spec_dst), ((struct in_pktinfo *)CMSG_DATA(cmptr))->ipi_ifindex);
-        }
-        memcpy(strClientIp, inet_ntoa(((struct in_pktinfo *)CMSG_DATA(cmptr))->ipi_spec_dst), sizeof(strClientIp) - 1);
-    }
+    memcpy(strClientIp, inet_ntoa(ptClientAddr->sin_addr), sizeof(strClientIp) - 1);
 
     pIoThreadContext->tMonitorElement.lRecvLength += nDataReadLen;
     pIoThreadContext->tMonitorElement.lRecvPackNum++;
