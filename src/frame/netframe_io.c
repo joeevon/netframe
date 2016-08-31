@@ -1124,7 +1124,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         nRet = lockfree_queue_enqueue(&(pHandleContext->io_handle_msgque), pIOHanldeData, 1);   //队列满了把数据丢掉,以免内存泄露
         if(nRet == false)
         {
-            LOG_SYS_ERROR("queue is full!");
+            LOG_SYS_ERROR("io_handle queue is full!");
             cnv_comm_Free(pPacket);
             cnv_comm_Free(pIOHanldeData);
             pIoThreadContext->tMonitorElement.lSvrFailedNum++;

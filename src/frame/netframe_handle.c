@@ -199,7 +199,8 @@ void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleCon
         void *pPostData = poll_unblock_queue_head(&pHandleContext->queuerespond);
         nRet = push_block_queue_tail(handle_io_msgque, pPostData, 1);  //队列满了把数据丢掉,以免内存泄露
         if(nRet == false)
-        {
+		{
+			LOG_SYS_ERROR("handle_io queue is full!");
             HANDLE_TO_IO_DATA *pHandleIOData = (HANDLE_TO_IO_DATA *)pPostData;
             cnv_comm_Free(pHandleIOData->pDataSend);
             cnv_comm_Free(pHandleIOData);
