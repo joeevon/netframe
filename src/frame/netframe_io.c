@@ -723,7 +723,6 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
             }
             else
             {
-                LOG_SYS_ERROR("write_service, iothread_get_hashsocket failed !");
                 SERVER_SOCKET_DATA *ptSvrSockData = get_svrsockdata_from_queue(pHandleIOData, pIoThreadContext->queServer);
                 if(ptSvrSockData)
                 {
