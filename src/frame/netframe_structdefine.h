@@ -48,7 +48,7 @@ extern "C"
     }
     enumDISTRIBUTE_TYPE;
 
-    // HANDLE CONTEXT
+    //HANDLE CONTEXT
     struct __IO_THREAD_CONTEXT;
     typedef struct  __HANDLE_THREAD_CONTEXT
     {
@@ -57,7 +57,6 @@ extern "C"
         int  Epollfd;
         int  io_handle_eventfd;  //io唤醒handle
         void *HashTimerTask;    //key:taskname   valude:cb function
-        struct __IO_THREAD_CONTEXT *szIoContext;
         CNV_UNBLOCKING_QUEUE *queDistribute;    //存放负载的线程
         CNV_UNBLOCKING_QUEUE *queParamFrames;   //框架handle使用的参数,有业务初始化好传进,所以由业务释放
         LOCKFREE_QUEUE  io_handle_msgque;
@@ -65,7 +64,7 @@ extern "C"
         void *pHandleParam;    //handle参数
     } HANDLE_THREAD_CONTEXT;
 
-    // HANDLE  ITEM
+    //HANDLE  ITEM
     typedef  struct  __HANDLE_THREAD_ITEM
     {
         char  strThreadName[DEFAULT_ARRAY_SIZE];
@@ -141,7 +140,7 @@ extern "C"
     {
         short threadindex;
         char threadname[20];
-        IO_THREAD_CONTEXT *pIoThreadContexts;   //所有IO线程的CONTEXT
+        LOCKFREE_QUEUE  poll_msgque;
         CNV_UNBLOCKING_QUEUE queuerespond;   //返回IO的数据
     } AUXILIARY_THREAD_CONTEXT;
 
@@ -249,13 +248,15 @@ extern "C"
         char  strTransmission[DEFAULT_ARRAY_SIZE];     //传输协议,IO需根据传输协议来收数据
         char  strProtocol[DEFAULT_ARRAY_SIZE]; //服务协议
         char strServiceName[DEFAULT_ARRAY_SIZE];  //服务名字,供找同类服务器使用
+        char strClientIp[DEFAULT_ARRAY_SIZE];
+        unsigned short uClientPort;
         int lSourceCode;   //来源
         struct sockaddr_in tClientAddr;
         struct iovec tIovecClnData;
         struct msghdr msg;       //数据内容
-		char strControl[CMSG_SPACE(sizeof(struct in_pktinfo))];
+        char strControl[CMSG_SPACE(sizeof(struct in_pktinfo))];
         SERVER_SOCKET_DATA tSvrSockData;
-        CLIENT_SOCKET_DATA  SocketData;  //相关读数据
+        CLIENT_SOCKET_DATA SocketData;  //相关读数据
         pfnCNV_PARSE_PROTOCOL  pfncnv_parse_protocol;   //协议解析回调函数
         pfnCNV_HANDLE_BUSINESS  pfncnv_handle_business;   //业务处理回调函数
         int  nReserveOne;   //保留变量

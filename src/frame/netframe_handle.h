@@ -31,13 +31,6 @@ extern "C"
         反初始化handle线程
     =========================================================*/
     extern void handle_thread_uninit(HANDLE_THREAD_CONTEXT *pHandleContexts);
-
-    /*=======================================================
-    功能:
-        handle线程获取io线程环境变量
-    =========================================================*/
-    extern int handle_set_iothread_context(IO_THREAD_CONTEXT *pIoThreadContexts, HANDLE_THREAD_CONTEXT *pHandleContexts);
-
 #ifdef __cplusplus
 };
 #endif

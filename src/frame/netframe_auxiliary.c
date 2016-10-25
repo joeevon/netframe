@@ -3,16 +3,25 @@
 #include "log/cnv_liblog4cplus.h"
 #include <unistd.h>
 
+extern IO_THREAD_CONTEXT g_szIoThreadContexts[MAX_IO_THREAD];
+
+void  free_auxiliary_lockfreequeue(LOCKFREE_QUEUE  *poll_msgque)
+{
+    AUXILIARY_QUEQUE_DATA *ptAuxiQueData = NULL;
+    int nCount = lockfree_queue_len(poll_msgque);
+    while(nCount--)
+    {
+        ptAuxiQueData = (AUXILIARY_QUEQUE_DATA *)lockfree_queue_dequeue(poll_msgque, 1);
+        free(ptAuxiQueData->pData);
+        free(ptAuxiQueData);
+    }
+}
+
 void auxiliary_thread_run(void *pThreadParameter)
 {
     int nRet = CNV_ERR_OK;
-    AUXILIARY_THREAD_ITEM *pTheadparam = (AUXILIARY_THREAD_ITEM *)pThreadParameter;
-    AUXILIARY_THREAD_CONTEXT *pAuxiliaryThreadContext = pTheadparam->pAuxiliaryThreadContext;
-    CNV_UNBLOCKING_QUEUE *queuerespond = &(pAuxiliaryThreadContext->queuerespond);
-    IO_THREAD_CONTEXT *pIoThreadContexts = pAuxiliaryThreadContext->pIoThreadContexts;
-    int szQueEvents[MAX_IO_THREAD] = { 0 };  //需要唤醒的IO线程索引
-    int nWakeIOCount = 0;  //需要唤醒的IO线程个数
-    uint64_t ulWakeup = 1;   //任意值,无实际意义,用于线程间唤醒
+    AUXILIARY_THREAD_CONTEXT *pAuxiliaryThdContext = ((AUXILIARY_THREAD_ITEM *)pThreadParameter)->pAuxiliaryThreadContext;
+    CNV_UNBLOCKING_QUEUE *queuerespond = &(pAuxiliaryThdContext->queuerespond);
     CALLBACK_STRUCT_T  tCallback;
     bzero(&tCallback, sizeof(tCallback));
     snprintf(tCallback.strProtocol, sizeof(tCallback.strProtocol) - 1, "auxiliary");
@@ -20,78 +29,80 @@ void auxiliary_thread_run(void *pThreadParameter)
 
     while(1)
     {
-        if(tCallback.pfncnv_handle_business)
+        AUXILIARY_QUEQUE_DATA *ptAuxiQueData = (AUXILIARY_QUEQUE_DATA *)lockfree_queue_dequeue(&pAuxiliaryThdContext->poll_msgque, 1);
+        if(ptAuxiQueData == NULL)
         {
-            tCallback.pfncnv_handle_business(NULL, queuerespond, NULL);
-        }
-        else  //避免死循环,也可assert退出
-        {
-            LOG_APP_ERROR("callback func is null!");
-            sleep(1);
+            //LOG_SYS_DEBUG("auxiliary poll empty queue.");
+            continue;
         }
 
-        int nNumOfPostMsg = get_unblock_queue_count(queuerespond);
-        if(nNumOfPostMsg <= 0)  //避免死循环
+        if(tCallback.pfncnv_auxiliary_callback != NULL)
         {
-            sleep(1);
+            tCallback.pfncnv_auxiliary_callback(ptAuxiQueData, queuerespond);
         }
+
+        uint64_t ulWakeup = 1;  //任意值,无实际意义
+        K_BOOL bIsWakeIO = K_FALSE;
+        int nNumOfPostMsg = get_unblock_queue_count(queuerespond);
         LOG_SYS_DEBUG("nNumOfPostMsg = %d", nNumOfPostMsg);
-        while(nNumOfPostMsg--)     //handle线程单独用的队列,无需加锁
+        while(nNumOfPostMsg--)     // handle线程单独用的队列,无需加锁
         {
-            HANDLE_TO_IO_DATA *pHandleIOData = (HANDLE_TO_IO_DATA *)poll_unblock_queue_head(queuerespond);
-            nRet = push_block_queue_tail(pIoThreadContexts[pHandleIOData->io_thread_index - 1].handle_io_msgque, pHandleIOData, 1);  //队列满了把数据丢掉,以免内存泄露
+            void *pPostData = poll_unblock_queue_head(queuerespond);
+            nRet = push_block_queue_tail(g_szIoThreadContexts[0].handle_io_msgque, pPostData, 1);  //队列满了把数据丢掉,以免内存泄露
             if(nRet == false)
             {
+                LOG_SYS_ERROR("handle_io queue is full!");
+                HANDLE_TO_IO_DATA *pHandleIOData = (HANDLE_TO_IO_DATA *)pPostData;
                 free(pHandleIOData->pDataSend);
                 free(pHandleIOData);
                 continue;
             }
-
-            int i = 0;
-            for(; i < nWakeIOCount; i++)  //确保每个线程只唤醒一次
-            {
-                if(szQueEvents[i] == pHandleIOData->io_thread_index - 1)
-                {
-                    break;
-                }
-            }
-            if(i >= nWakeIOCount)
-            {
-                szQueEvents[nWakeIOCount++] = pHandleIOData->io_thread_index - 1;
-            }
+            bIsWakeIO = true;
         }
 
-        for(int i = 0; i < nWakeIOCount; i++)
+        if(bIsWakeIO)
         {
-            nRet = write(pIoThreadContexts[szQueEvents[i]].handle_io_eventfd , &ulWakeup, sizeof(ulWakeup));  //handle唤醒io
+            nRet = write(g_szIoThreadContexts[0].handle_io_eventfd, &ulWakeup, sizeof(ulWakeup));  //handle唤醒io
             if(nRet != sizeof(ulWakeup))
             {
                 LOG_SYS_ERROR("handle wake io failed.");
             }
+            bIsWakeIO = K_FALSE;
         }
 
-        bzero(szQueEvents, sizeof(szQueEvents));
-        nWakeIOCount = 0;
+        free(ptAuxiQueData->pData);
+        free(ptAuxiQueData);
     }
 }
 
-int  auxiliary_thread_init(AUXILIARY_THREAD_ITEM *pConfigAuxiliaryItem, IO_THREAD_CONTEXT *pIoThreadContexts, AUXILIARY_THREAD_CONTEXT *pAuxiliaryThreadContext)
+void auxiliary_thread_uninit(AUXILIARY_THREAD_CONTEXT *pAuxiliaryContexts)
 {
-    pAuxiliaryThreadContext->pIoThreadContexts = pIoThreadContexts;
+    for(int i = 0; i < g_params.tConfigAuxiliary.lNumberOfThread; i++)
+    {
+        AUXILIARY_THREAD_CONTEXT *pAuxiliaryContext = &pAuxiliaryContexts[i];
+        free_handleio_unblockqueue(&(pAuxiliaryContext->queuerespond));  //写给IO的队列
+        free_auxiliary_lockfreequeue(&(pAuxiliaryContext->poll_msgque));
+        lockfree_queue_uninit(&(pAuxiliaryContext->poll_msgque));
+    }
+}
+
+int  auxiliary_thread_init(AUXILIARY_THREAD_ITEM *pConfigAuxiliaryItem, AUXILIARY_THREAD_CONTEXT *pAuxiliaryThreadContext)
+{
+    lockfree_queue_init(&(pAuxiliaryThreadContext->poll_msgque), 1000);
     initiate_unblock_queue(&(pAuxiliaryThreadContext->queuerespond), DEFAULT_QUEUE_CAPCITY);   //业务返回的消息队列
     pConfigAuxiliaryItem->pAuxiliaryThreadContext = pAuxiliaryThreadContext;
 
     return CNV_ERR_OK;
 }
 
-int auxiliary_thread_start(IO_THREAD_CONTEXT *pIoThreadContexts, AUXILIARY_THREAD_CONTEXT *pAuxiliaryContexts)
+int auxiliary_thread_start(AUXILIARY_THREAD_CONTEXT *pAuxiliaryContexts)
 {
     int nRet = CNV_ERR_OK;
 
     for(int i = 0; i < g_params.tConfigAuxiliary.lNumberOfThread; i++)
     {
         AUXILIARY_THREAD_CONTEXT *pAuxiliaryThreadContext = &(pAuxiliaryContexts[i]);
-        nRet = auxiliary_thread_init(&(g_params.tConfigAuxiliary.szConfigAuxiliaryItem[i]), pIoThreadContexts, pAuxiliaryThreadContext);
+        nRet = auxiliary_thread_init(&(g_params.tConfigAuxiliary.szConfigAuxiliaryItem[i]), pAuxiliaryThreadContext);
         if(nRet != CNV_ERR_OK)
         {
             return nRet;
@@ -103,14 +114,4 @@ int auxiliary_thread_start(IO_THREAD_CONTEXT *pIoThreadContexts, AUXILIARY_THREA
     }
 
     return nRet;
-}
-
-void auxiliary_thread_uninit(AUXILIARY_THREAD_CONTEXT *pAuxiliaryContexts)
-{
-    for(int i = 0; i < g_params.tConfigAuxiliary.lNumberOfThread; i++)
-    {
-        AUXILIARY_THREAD_CONTEXT *pAuxiliaryContext = &pAuxiliaryContexts[i];
-        free_handleio_unblockqueue(&(pAuxiliaryContext->queuerespond));  //写给IO的队列
-    }
-
 }

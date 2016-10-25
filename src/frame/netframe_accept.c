@@ -71,9 +71,9 @@ int  accept_set_iodata(int ClientFd, ACCEPT_THREAD_ITEM *pAcceptItem, struct soc
     else    //用客户端的ip和端口做映射
     {
         AcceptIOData->uMapType = 1;
-        memcpy(AcceptIOData->strClientIp, inet_ntoa(ClientAddr->sin_addr), sizeof(AcceptIOData->strClientIp) - 1);
-        AcceptIOData->uClientPort = ntohs(ClientAddr->sin_port);
     }
+    memcpy(AcceptIOData->strClientIp, inet_ntoa(ClientAddr->sin_addr), sizeof(AcceptIOData->strClientIp) - 1);
+    AcceptIOData->uClientPort = ntohs(ClientAddr->sin_port);
     snprintf(AcceptIOData->strTransmission, sizeof(AcceptIOData->strTransmission) - 1, "%s", pAcceptItem->strTransmission);   // 通信协议
     snprintf(AcceptIOData->strProtocol, sizeof(AcceptIOData->strProtocol) - 1, "%s", pAcceptItem->tCallback.strProtocol);     // 服务协议
     AcceptIOData->pfncnv_parse_protocol = pAcceptItem->tCallback.pfncnv_parse_protocol;
@@ -140,6 +140,11 @@ int  accept_init_server(ACCEPT_THREAD_CONTEXT *pAcceptContext, ACCEPT_THREAD_ITE
     else
     {
         set_callback_function(CLIENT_CALLBACK_FUNC, &(pAcceptItem->tCallback));  //设置回调函数
+        if(pAcceptItem->tCallback.pfncnv_handle_business == NULL)
+        {
+            LOG_SYS_ERROR("handle callback function is null.");
+            return -1;
+        }
     }
 
     if(!strcmp(pAcceptItem->strTransmission, "UDP"))   //udp协议创建好socket后直接添加到io线程epoll等待数据

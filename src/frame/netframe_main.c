@@ -22,6 +22,9 @@
 #include <signal.h>
 
 GLOBAL_PARAMS  g_params;      //全局配置参数
+IO_THREAD_CONTEXT g_szIoThreadContexts[MAX_IO_THREAD];
+HANDLE_THREAD_CONTEXT  g_szHandleContexts[MAX_HANDLE_THREAD];
+AUXILIARY_THREAD_CONTEXT g_szAuxiliaryContext[MAX_AUXILIARY_THREAD];
 
 void  netframe_pthread_join()
 {
@@ -102,35 +105,32 @@ void  netframe_uninit(ACCEPT_THREAD_CONTEXT *pAcceptContexts, IO_THREAD_CONTEXT 
 int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nMaxPacketSize)
 {
     int nRet = CNV_ERR_OK;
+    bzero(&g_params, sizeof(g_params));
     ACCEPT_THREAD_CONTEXT tAcceptContext;
-    memset(&tAcceptContext, 0, sizeof(tAcceptContext));
-    IO_THREAD_CONTEXT szIoThreadContexts[MAX_IO_THREAD] ;
-    memset(szIoThreadContexts, 0x00, sizeof(szIoThreadContexts));
-    HANDLE_THREAD_CONTEXT  szHandleContexts[MAX_HANDLE_THREAD];
-    memset(szHandleContexts, 0, sizeof(szHandleContexts));
-    AUXILIARY_THREAD_CONTEXT szAuxiliaryContext[MAX_AUXILIARY_THREAD];
-    memset(szAuxiliaryContext, 0, sizeof(szAuxiliaryContext));
-    memset(&g_params, 0x00, sizeof(g_params));
+    bzero(&tAcceptContext, sizeof(tAcceptContext));
+    bzero(g_szIoThreadContexts, sizeof(g_szIoThreadContexts));
+    bzero(g_szHandleContexts, sizeof(g_szHandleContexts));
+    bzero(g_szAuxiliaryContext, sizeof(g_szAuxiliaryContext));
 
     if(signal(SIGCHLD, sig_donothing) == SIG_ERR)
     {
-        exit(0);
+        return -1;
     }
 
     if(signal(SIGPIPE, sig_donothing) == SIG_ERR)
     {
-        exit(0);
+        return -1;
     }
 
     if(signal(SIGALRM, sig_donothing) == SIG_ERR)
     {
-        exit(0);
+        return -1;
     }
 
     if(nMaxPacketSize <= 0 || nMaxPacketSize > MAX_PACKET_SZIE)
     {
         LOG_SYS_FATAL("buffer size is illegal:%d! it should between 0 and 65000.", nMaxPacketSize);
-        exit(-1);
+        return -1;
     }
     g_params.nMaxBufferSize = nMaxPacketSize;
 
@@ -153,7 +153,7 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
     }
 
     //开启handle线程
-    nRet = handle_thread_start(szHandleContexts);
+    nRet = handle_thread_start(g_szHandleContexts);
     if(nRet != CNV_ERR_OK)
     {
         LOG_SYS_FATAL("handle_thread_start error : %d ", nRet);
@@ -162,7 +162,7 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
     LOG_SYS_DEBUG("handle_thread_start ok.");
 
     //开启IO线程
-    nRet = io_thread_start(szHandleContexts, szIoThreadContexts, queServer);
+    nRet = io_thread_start(g_szHandleContexts, g_szIoThreadContexts, queServer);
     if(nRet != CNV_ERR_OK)
     {
         LOG_SYS_FATAL("io_thread_start error : %d ", nRet);
@@ -170,14 +170,8 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
     }
     LOG_SYS_DEBUG("io_thread_start ok.");
 
-    nRet = handle_set_iothread_context(szIoThreadContexts, szHandleContexts);
-    if(nRet != CNV_ERR_OK)
-    {
-        return nRet;
-    }
-
     //开启AUXILIARY线程
-    nRet = auxiliary_thread_start(szIoThreadContexts, szAuxiliaryContext);
+    nRet = auxiliary_thread_start(g_szAuxiliaryContext);
     if(nRet != CNV_ERR_OK)
     {
         LOG_SYS_FATAL("auxiliary_thread_start error : %d ", nRet);
@@ -186,7 +180,7 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
     LOG_SYS_DEBUG("auxiliary_thread_start ok.");
 
     //开启accept线程
-    nRet = accept_thread_start(szIoThreadContexts, &tAcceptContext);
+    nRet = accept_thread_start(g_szIoThreadContexts, &tAcceptContext);
     if(nRet != CNV_ERR_OK)
     {
         LOG_SYS_FATAL("cnv_agent_start_accept_thread error : %d ", nRet);
@@ -196,7 +190,7 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
 
     netframe_pthread_join();   //线程挂起
     netframe_pthread_stop(); //终止线程
-    netframe_uninit(&tAcceptContext, szIoThreadContexts, szHandleContexts, szAuxiliaryContext);  //反初始化
+    netframe_uninit(&tAcceptContext, g_szIoThreadContexts, g_szHandleContexts, g_szAuxiliaryContext);  //反初始化
 
     return  CNV_ERR_OK;
 }

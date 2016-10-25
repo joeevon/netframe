@@ -28,6 +28,8 @@
 #include <sys/timerfd.h>
 #include <errno.h>
 
+extern IO_THREAD_CONTEXT g_szIoThreadContexts[MAX_IO_THREAD];
+
 K_BOOL earase_hashtimer_callback(void  *pKey, void  *pValue, void  *pContext, K_BOOL *bIsEarase)
 {
     HASHMAP_VALUE *pHashValue = (HASHMAP_VALUE *)pValue;
@@ -53,107 +55,6 @@ void  free_iohandle_lockfreequeue(LOCKFREE_QUEUE  *io_handle_msgque)
     }
 }
 
-void handlethread_wakeup_allio(CNV_UNBLOCKING_QUEUE *queuerespond)
-{
-    int nRet = CNV_ERR_OK;
-    int lAction = 0;
-    uint64_t ulWakeup = 1;  //任意值,无实际意义
-    K_BOOL bIsWakeup;
-
-    if(queuerespond && get_unblock_queue_count(queuerespond))
-    {
-        for(int i = 0; i < g_params.tConfigIO.lNumberOfThread; i++)
-        {
-            bIsWakeup = K_FALSE;
-            struct queue_entry_t *queuenode = get_unblock_queue_first(queuerespond);
-            while(queuenode && queuenode->data_)
-            {
-                HANDLE_TO_IO_DATA *ptPostData = (HANDLE_TO_IO_DATA *)(queuenode->data_);
-                HANDLE_TO_IO_DATA *ptHandleIoData = (HANDLE_TO_IO_DATA *)cnv_comm_Malloc(sizeof(HANDLE_TO_IO_DATA));
-                bzero(ptHandleIoData, sizeof(HANDLE_TO_IO_DATA));
-                ptHandleIoData->lAction = ptPostData->lAction;
-                ptHandleIoData->lConnectID = ptPostData->lConnectID;
-                snprintf(ptHandleIoData->strServIp, sizeof(ptHandleIoData->strServIp) - 1, "%s", ptPostData->strServIp);
-                ptHandleIoData->ulPort = ptPostData->ulPort;
-                lAction = ptPostData->lAction;
-                if(ptPostData->lAction == REFRESH_CONNECT)
-                {
-                    ptHandleIoData->pDataSend = (char *)cnv_comm_Malloc(sizeof(CNV_UNBLOCKING_QUEUE));
-                    CNV_UNBLOCKING_QUEUE *queServer = (CNV_UNBLOCKING_QUEUE *)ptHandleIoData->pDataSend;
-                    initiate_unblock_queue(queServer, ptPostData->lDataLen);  //队列时ptHandleIoData->lDataLen为队列长度
-
-                    CNV_UNBLOCKING_QUEUE *queServerIn = (CNV_UNBLOCKING_QUEUE *)ptPostData->pDataSend;
-                    struct queue_entry_t *queuenode2 = get_unblock_queue_first(queServerIn);
-                    while(queuenode2 && queuenode2->data_)
-                    {
-                        SERVER_SOCKET_DATA *ptSvrSockDataIn = (SERVER_SOCKET_DATA *)queuenode2->data_;
-                        SERVER_SOCKET_DATA *ptSvrSockData = (SERVER_SOCKET_DATA *)cnv_comm_Malloc(sizeof(SERVER_SOCKET_DATA));
-                        bzero(ptSvrSockData, sizeof(SERVER_SOCKET_DATA));
-                        snprintf(ptSvrSockData->strServerIp, sizeof(ptSvrSockData->strServerIp) - 1, "%s", ptSvrSockDataIn->strServerIp);
-                        ptSvrSockData->lPort = ptSvrSockDataIn->lPort;
-                        ptSvrSockData->lHeartBeatLen = ptSvrSockDataIn->lHeartBeatLen;
-                        ptSvrSockData->pHeartBeat = (K_CHAR *)cnv_comm_Malloc(ptSvrSockData->lHeartBeatLen);
-                        memcpy(ptSvrSockData->pHeartBeat, ptSvrSockDataIn->pHeartBeat, ptSvrSockData->lHeartBeatLen);
-                        snprintf(ptSvrSockData->strServiceName, sizeof(ptSvrSockData->strServiceName) - 1, ptSvrSockDataIn->strServiceName);
-                        snprintf(ptSvrSockData->tCallback.strProtocol, sizeof(ptSvrSockData->tCallback.strProtocol) - 1, ptSvrSockDataIn->tCallback.strProtocol);
-                        push_unblock_queue_tail(queServer, ptSvrSockData);
-                        queuenode2 = get_unblock_queue_next(queuenode2);
-                    }
-                }
-                else
-                {
-                    ptHandleIoData->lDataLen = ptPostData->lDataLen;
-                    ptHandleIoData->pDataSend = (char *)cnv_comm_Malloc(ptHandleIoData->lDataLen);
-                    memcpy(ptHandleIoData->pDataSend, ptPostData->pDataSend, ptHandleIoData->lDataLen);
-                }
-
-                nRet = push_block_queue_tail(g_params.tConfigIO.szConfigIOItem[i].pIoThreadContext->handle_io_msgque, ptHandleIoData, 1);  //队列满了把数据丢掉,以免内存泄露
-                if(nRet == false)
-                {
-                    cnv_comm_Free(ptHandleIoData->pDataSend);
-                    cnv_comm_Free(ptHandleIoData);
-                }
-                bIsWakeup = K_TRUE;
-                queuenode = get_unblock_queue_next(queuenode);
-            }
-
-            if(bIsWakeup)
-            {
-                nRet = write(g_params.tConfigIO.szConfigIOItem[i].pIoThreadContext->handle_io_eventfd, &ulWakeup, sizeof(ulWakeup));  //handle唤醒io
-                if(nRet != sizeof(ulWakeup))
-                {
-                    LOG_SYS_ERROR("handle wake io failed.");
-                }
-            }
-
-            if(lAction == REFRESH_CONNECT)   //刷新长连接只要通知一个IO即可,因为所有IO线程公用一个服务器队列
-            {
-                break;
-            }
-        }
-    }
-
-    int nCount = get_unblock_queue_count(queuerespond);
-    while(nCount--)
-    {
-        HANDLE_TO_IO_DATA *ptHandleIoData = (HANDLE_TO_IO_DATA *)poll_unblock_queue_head(queuerespond);
-        if(ptHandleIoData->lAction == REFRESH_CONNECT)
-        {
-            CNV_UNBLOCKING_QUEUE *queueServer = (CNV_UNBLOCKING_QUEUE *)ptHandleIoData->pDataSend;
-            int nCountSvr = get_unblock_queue_count(queueServer);
-            while(nCountSvr--)
-            {
-                SERVER_SOCKET_DATA *ptSvrSockData = (SERVER_SOCKET_DATA *)poll_unblock_queue_head(queueServer);
-                cnv_comm_Free(ptSvrSockData->pHeartBeat);
-                cnv_comm_Free(ptSvrSockData);
-            }
-            destory_unblock_queue(queueServer);
-        }
-        cnv_comm_Free(ptHandleIoData->pDataSend);
-        cnv_comm_Free(ptHandleIoData);
-    }
-}
-
 //处理io消息
 void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleContext)
 {
@@ -164,16 +65,13 @@ void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleCon
     }
 
     HANDLE_PARAMS *ptHandleParams = (pHandleContext->pHandleParam ? (HANDLE_PARAMS *)pHandleContext->pHandleParam : NULL);
-    if(pIOHanldeData->pfncnv_handle_business)
+    if(ptHandleParams && ptHandleParams->pBusinessParams)
     {
-        if(ptHandleParams && ptHandleParams->pBusinessParams)
-        {
-            pIOHanldeData->pfncnv_handle_business(pIOHanldeData, &pHandleContext->queuerespond, ptHandleParams->pBusinessParams);  //执行回调函数
-        }
-        else
-        {
-            pIOHanldeData->pfncnv_handle_business(pIOHanldeData, &pHandleContext->queuerespond, NULL);  //执行回调函数
-        }
+        pIOHanldeData->pfncnv_handle_business(pIOHanldeData, &pHandleContext->queuerespond, ptHandleParams->pBusinessParams);  //执行回调函数
+    }
+    else
+    {
+        pIOHanldeData->pfncnv_handle_business(pIOHanldeData, &pHandleContext->queuerespond, NULL);  //执行回调函数
     }
 
     int nRet = CNV_ERR_OK;
@@ -190,8 +88,8 @@ void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleCon
         push_unblock_queue_tail(pHandleContext->queDistribute, pThreadIndex);    //此处取出后重新插入,达到分配效果
         int lThreadIndex = atoi(pThreadIndex);
         LOG_SYS_DEBUG("handle thread %d select io thread %d", pHandleContext->lthreadindex, lThreadIndex);
-        handle_io_msgque = pHandleContext->szIoContext[lThreadIndex - 1].handle_io_msgque;
-        handle_io_eventfd = pHandleContext->szIoContext[lThreadIndex - 1].handle_io_eventfd;
+        handle_io_msgque = g_szIoThreadContexts[lThreadIndex - 1].handle_io_msgque;
+        handle_io_eventfd = g_szIoThreadContexts[lThreadIndex - 1].handle_io_eventfd;
     }
     else
     {
@@ -379,10 +277,7 @@ int  handle_thread_run(void *pThreadParameter)
                             if(ptCbFunctionStr->pfnCALLBACK_FUNCTION)
                             {
                                 ptCbFunctionStr->pfnCALLBACK_FUNCTION(&pHandleContext->queuerespond, pHandleParams->pBusinessParams);
-                                if(get_unblock_queue_count(&pHandleContext->queuerespond) > 0)
-                                {
-                                    handlethread_wakeup_allio(&pHandleContext->queuerespond);
-                                }
+                                //定时后的操作
                             }
                         }
                     }
@@ -412,34 +307,6 @@ int  handle_thread_run(void *pThreadParameter)
     }
 
     return nRet;
-}
-
-int handle_set_iothread_context(IO_THREAD_CONTEXT *pIoThreadContexts, HANDLE_THREAD_CONTEXT *pHandleContexts)
-{
-    int i;
-    for(i = 0; i < g_params.tConfigHandle.lNumberOfThread; i++)
-    {
-        HANDLE_THREAD_CONTEXT *pHandleContext = &pHandleContexts[i];
-        pHandleContext->szIoContext = pIoThreadContexts;
-
-        if(get_unblock_queue_count(pHandleContext->queDistribute) > 0)
-        {
-            struct queue_entry_t *queuenode = get_unblock_queue_first(pHandleContext->queDistribute);
-            while(queuenode)
-            {
-                int nThreadIndex = atoi((char *)queuenode->data_);
-                if(&pHandleContext->szIoContext[nThreadIndex - 1] == NULL)
-                {
-                    LOG_APP_ERROR("handle_set_iothread_context error.");
-                    return -1;
-                }
-
-                queuenode = get_unblock_queue_next(queuenode);
-            }
-        }
-    }
-
-    return 0;
 }
 
 void handle_thread_uninit(HANDLE_THREAD_CONTEXT *pHandleContexts)

@@ -25,7 +25,7 @@ extern "C"
     功能:
         开启auxiliary线程
     =========================================================*/
-    extern int auxiliary_thread_start(IO_THREAD_CONTEXT *pIoThreadContexts, AUXILIARY_THREAD_CONTEXT *pAuxiliaryContexts);
+    extern int auxiliary_thread_start(AUXILIARY_THREAD_CONTEXT *pAuxiliaryContexts);
 
     /*=======================================================
     功能:

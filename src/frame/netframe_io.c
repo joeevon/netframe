@@ -33,73 +33,7 @@
 #include <arpa/inet.h>
 
 int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle_io_msgque, void *HashAddrFd, void *HashConnidFd, IO_THREAD_CONTEXT *pIoThreadContext);
-
-int io_send_monitor(IO_THREAD_CONTEXT *pIoThreadContext)
-{
-    HANDLE_TO_IO_DATA *ptHandleIoData = NULL;
-
-    int nRet = pIoThreadContext->pfncnv_monitor_callback(&pIoThreadContext->tMonitorElement, &ptHandleIoData);
-    if(nRet != 0)
-    {
-        return nRet;
-    }
-
-    nRet = push_block_queue_tail(pIoThreadContext->handle_io_msgque, ptHandleIoData, 1);  //队列满了把数据丢掉,以免内存泄露
-    if(nRet == false)
-    {
-        cnv_comm_Free(ptHandleIoData->pDataSend);
-        cnv_comm_Free(ptHandleIoData);
-        return -1;
-    }
-
-    iothread_handle_respond(pIoThreadContext->Epollfd, pIoThreadContext->handle_io_eventfd, pIoThreadContext->handle_io_msgque, pIoThreadContext->HashAddrFd, pIoThreadContext->HashAddrFd, pIoThreadContext);
-    return 0;
-}
-
-void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
-{
-    LOG_ACC_DEBUG("io %d, RecvLengthPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvLength / g_params.tMonitor.interval_sec);
-    LOG_ACC_DEBUG("io %d, RcvPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvPackNum / g_params.tMonitor.interval_sec);
-    LOG_ACC_DEBUG("io %d, ParsePackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lParsePackNum / g_params.tMonitor.interval_sec);
-    LOG_ACC_DEBUG("io %d, RepTimesPerSecond=%d", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.nRespondTimes / g_params.tMonitor.interval_sec);
-    LOG_ACC_DEBUG("io %d, SvrPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lSvrPackNum / g_params.tMonitor.interval_sec);
-    LOG_ACC_DEBUG("io %d, SvrFailedNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lSvrFailedNum / g_params.tMonitor.interval_sec);
-    LOG_ACC_DEBUG("io %d, SeedOfKey=%d", pIoThreadContext->threadindex, pIoThreadContext->SeedOfKey);
-    if(pIoThreadContext->queServer)
-    {
-        LOG_ACC_DEBUG("io %d, queServer.count=%d", pIoThreadContext->threadindex, get_unblock_queue_count(pIoThreadContext->queServer));
-    }
-    else
-    {
-        LOG_ACC_DEBUG("io %d, queServer.count=%d", pIoThreadContext->threadindex, 0);
-    }
-    LOG_ACC_DEBUG("io %d, HashConnidFd.size=%d", pIoThreadContext->threadindex, cnv_hashmap_size(pIoThreadContext->HashConnidFd));
-    LOG_ACC_DEBUG("io %d, HashAddrFd.size=%d", pIoThreadContext->threadindex, cnv_hashmap_size(pIoThreadContext->HashAddrFd));
-    LOG_ACC_DEBUG("io %d, handle_io_msgque.size=%d", pIoThreadContext->threadindex, get_block_queue_count(pIoThreadContext->handle_io_msgque));
-    for(int i = 0; i < g_params.tConfigHandle.lNumberOfThread; i++)
-    {
-        if(pIoThreadContext->szHandleContext[i + 1])
-        {
-            LOG_ACC_DEBUG("handle %d, io_handle_msgque.size=%d", i + 1, lockfree_queue_len(&(pIoThreadContext->szHandleContext[i + 1]->io_handle_msgque)));
-
-            pIoThreadContext->tMonitorElement.szHanldeMsgQueCount[pIoThreadContext->tMonitorElement.nHandleThreadCount] = lockfree_queue_len(&(pIoThreadContext->szHandleContext[i + 1]->io_handle_msgque));
-            pIoThreadContext->tMonitorElement.nHandleThreadCount++;
-        }
-    }
-
-    if(pIoThreadContext->pfncnv_monitor_callback)
-    {
-        memcpy(pIoThreadContext->tMonitorElement.strStartTime, pIoThreadContext->strStartTime, sizeof(pIoThreadContext->tMonitorElement.strStartTime) - 1);
-        pIoThreadContext->tMonitorElement.nThreadIndex = pIoThreadContext->threadindex;
-        pIoThreadContext->tMonitorElement.nClientConNum = cnv_hashmap_size(pIoThreadContext->HashConnidFd);
-        pIoThreadContext->tMonitorElement.nSvrConnNum = cnv_hashmap_size(pIoThreadContext->HashAddrFd);
-        pIoThreadContext->tMonitorElement.nIoMsgQueCount = get_block_queue_count(pIoThreadContext->handle_io_msgque);
-        io_send_monitor(pIoThreadContext);
-    }
-
-    bzero(&pIoThreadContext->tMonitorElement, sizeof(pIoThreadContext->tMonitorElement));
-    LOG_ACC_DEBUG("");
-}
+extern AUXILIARY_THREAD_CONTEXT g_szAuxiliaryContext[MAX_AUXILIARY_THREAD];
 
 void free_acceptio_fifo(cnv_fifo *accept_io_msgque)
 {
@@ -141,6 +75,61 @@ void free_server_unblock_queue(CNV_UNBLOCKING_QUEUE *queServer)
         cnv_comm_Free(ptSvrSockData->pHeartBeat);
         cnv_comm_Free(ptSvrSockData);
     }
+}
+
+void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
+{
+    LOG_ACC_DEBUG("io %d, RecvLengthPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvLength / g_params.tMonitor.interval_sec);
+    LOG_ACC_DEBUG("io %d, RcvPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvPackNum / g_params.tMonitor.interval_sec);
+    LOG_ACC_DEBUG("io %d, ParsePackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lParsePackNum / g_params.tMonitor.interval_sec);
+    LOG_ACC_DEBUG("io %d, RepTimesPerSecond=%d", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.nRespondTimes / g_params.tMonitor.interval_sec);
+    LOG_ACC_DEBUG("io %d, SvrPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lSvrPackNum / g_params.tMonitor.interval_sec);
+    LOG_ACC_DEBUG("io %d, SvrFailedNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lSvrFailedNum / g_params.tMonitor.interval_sec);
+    LOG_ACC_DEBUG("io %d, SeedOfKey=%d", pIoThreadContext->threadindex, pIoThreadContext->SeedOfKey);
+    if(pIoThreadContext->queServer)
+    {
+        LOG_ACC_DEBUG("io %d, queServer.count=%d", pIoThreadContext->threadindex, get_unblock_queue_count(pIoThreadContext->queServer));
+    }
+    else
+    {
+        LOG_ACC_DEBUG("io %d, queServer.count=%d", pIoThreadContext->threadindex, 0);
+    }
+    LOG_ACC_DEBUG("io %d, HashConnidFd.size=%d", pIoThreadContext->threadindex, cnv_hashmap_size(pIoThreadContext->HashConnidFd));
+    LOG_ACC_DEBUG("io %d, HashAddrFd.size=%d", pIoThreadContext->threadindex, cnv_hashmap_size(pIoThreadContext->HashAddrFd));
+    LOG_ACC_DEBUG("io %d, handle_io_msgque.size=%d", pIoThreadContext->threadindex, get_block_queue_count(pIoThreadContext->handle_io_msgque));
+    for(int i = 0; i < g_params.tConfigHandle.lNumberOfThread; i++)
+    {
+        if(pIoThreadContext->szHandleContext[i + 1])
+        {
+            LOG_ACC_DEBUG("handle %d, io_handle_msgque.size=%d", i + 1, lockfree_queue_len(&(pIoThreadContext->szHandleContext[i + 1]->io_handle_msgque)));
+
+            pIoThreadContext->tMonitorElement.szHanldeMsgQueCount[pIoThreadContext->tMonitorElement.nHandleThreadCount] = lockfree_queue_len(&(pIoThreadContext->szHandleContext[i + 1]->io_handle_msgque));
+            pIoThreadContext->tMonitorElement.nHandleThreadCount++;
+        }
+    }
+
+    if(pIoThreadContext->pfncnv_monitor_callback)
+    {
+        memcpy(pIoThreadContext->tMonitorElement.strStartTime, pIoThreadContext->strStartTime, sizeof(pIoThreadContext->tMonitorElement.strStartTime) - 1);
+        pIoThreadContext->tMonitorElement.nThreadIndex = pIoThreadContext->threadindex;
+        pIoThreadContext->tMonitorElement.nClientConNum = cnv_hashmap_size(pIoThreadContext->HashConnidFd);
+        pIoThreadContext->tMonitorElement.nSvrConnNum = cnv_hashmap_size(pIoThreadContext->HashAddrFd);
+        pIoThreadContext->tMonitorElement.nIoMsgQueCount = get_block_queue_count(pIoThreadContext->handle_io_msgque);
+
+        AUXILIARY_QUEQUE_DATA *ptAuxiQueData = NULL;
+        pIoThreadContext->pfncnv_monitor_callback(&pIoThreadContext->tMonitorElement, &ptAuxiQueData);
+
+        int nRet = lockfree_queue_enqueue(&(g_szAuxiliaryContext[0].poll_msgque), ptAuxiQueData, 1);   //队列满了把数据丢掉,以免内存泄露
+        if(nRet == false)
+        {
+            LOG_SYS_ERROR("auxiliary queue is full!");
+            cnv_comm_Free(ptAuxiQueData->pData);
+            cnv_comm_Free(ptAuxiQueData);
+        }
+    }
+
+    bzero(&pIoThreadContext->tMonitorElement, sizeof(pIoThreadContext->tMonitorElement));
+    LOG_ACC_DEBUG("");
 }
 
 int iothread_handle_write(int Epollfd, void *pConnId, void *HashConnidFd, IO_THREAD_CONTEXT *pIoThreadContext)
@@ -888,8 +877,19 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
         pSocketElement->uSockElement.tClnSockElement.msg.msg_iovlen = 1;
         pSocketElement->uSockElement.tClnSockElement.msg.msg_control = pSocketElement->uSockElement.tClnSockElement.strControl;
         pSocketElement->uSockElement.tClnSockElement.msg.msg_controllen = sizeof(pSocketElement->uSockElement.tClnSockElement.strControl);
+        memcpy(pSocketElement->uSockElement.tClnSockElement.strClientIp, AcceptIOData.strClientIp, sizeof(pSocketElement->uSockElement.tClnSockElement.strClientIp) - 1);
+        pSocketElement->uSockElement.tClnSockElement.uClientPort = AcceptIOData.uClientPort;
         pSocketElement->uSockElement.tClnSockElement.pfncnv_parse_protocol = AcceptIOData.pfncnv_parse_protocol;
         pSocketElement->uSockElement.tClnSockElement.pfncnv_handle_business = AcceptIOData.pfncnv_handle_business;
+
+        if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)    //接收数据缓存
+        {
+            pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer = malloc(g_params.nMaxBufferSize);
+            if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)
+            {
+                return  CNV_ERR_MALLOC;
+            }
+        }
 
         char *pKey = (char *)cnv_comm_Malloc(33);
         if(!pKey)
@@ -964,7 +964,6 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
 {
     LOG_SYS_DEBUG("iothread_handle_read.");
     int nDataReadLen = 0;
-    int nDistributeValue = 0;   //分发类型为哈希时,需要使用的哈希值
     unsigned int nPacketSize = 0;
     void  *pOutValue = NULL;
     void *pAuxiliary = NULL;
@@ -981,16 +980,8 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
     SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
     struct msghdr *pmsg = &(pSocketElement->uSockElement.tClnSockElement.msg);
     CLIENT_SOCKET_DATA *ptClnSockData = &(pSocketElement->uSockElement.tClnSockElement.SocketData);
-    if(!ptClnSockData->pDataBuffer)   //接收数据缓存
-    {
-        ptClnSockData->pDataBuffer = cnv_comm_Malloc(g_params.nMaxBufferSize);
-        if(!ptClnSockData->pDataBuffer)
-        {
-            return  CNV_ERR_MALLOC;
-        }
-    }
-    pmsg->msg_iov->iov_base = ptClnSockData->pDataBuffer + ptClnSockData->lDataRemain;       //读缓存
-    pmsg->msg_iov->iov_len = g_params.nMaxBufferSize - ptClnSockData->lDataRemain;      //空闲缓存长度
+    pmsg->msg_iov->iov_base = ptClnSockData->pDataBuffer + ptClnSockData->lDataRemain;       //拼接剩余数据
+    pmsg->msg_iov->iov_len = g_params.nMaxBufferSize - ptClnSockData->lDataRemain;    //剩余缓存长度
     bzero(pmsg->msg_iov->iov_base, pmsg->msg_iov->iov_len);
 
     nRet = netframe_recvmsg(pSocketElement->Socket, pmsg, &nDataReadLen);  //接收数据
@@ -1013,10 +1004,11 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         return nRet;
     }
 
-    struct sockaddr_in *ptClientAddr = (struct sockaddr_in *)(pmsg->msg_name);
-    LOG_SYS_DEBUG("peer ip:%s", inet_ntoa(ptClientAddr->sin_addr));
-    char strClientIp[32] = { 0 };
-    memcpy(strClientIp, inet_ntoa(ptClientAddr->sin_addr), sizeof(strClientIp) - 1);
+    //udp
+    //struct sockaddr_in *ptClientAddr = (struct sockaddr_in *)(pmsg->msg_name);
+    //LOG_SYS_DEBUG("peer ip:%s", inet_ntoa(ptClientAddr->sin_addr));
+    //char strClientIp[32] = { 0 };
+    //memcpy(strClientIp, inet_ntoa(ptClientAddr->sin_addr), sizeof(strClientIp) - 1);
 
     pIoThreadContext->tMonitorElement.lRecvLength += nDataReadLen;
     pIoThreadContext->tMonitorElement.lRecvPackNum++;
@@ -1073,18 +1065,6 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
             break;
         }
 
-        if(pIoThreadContext->nDistributeType == DISTRIBUTE_TYPE_HASH)
-        {
-            if(pAuxiliary)
-            {
-                nDistributeValue = *(int *)pAuxiliary;
-            }
-            else
-            {
-                nDistributeValue = atol((char *)&nDataReadLen) % pIoThreadContext->nHandleThreadCount;   //取随机数
-            }
-        }
-
         ptClnSockData->lDataRemain -= nPacketSize;      //总数据长度减去一个包的数据大小
         if(ptClnSockData->lDataRemain == 0 && pAuxiliary)    //解析完了才把pAuxiliary内存释放
         {
@@ -1100,8 +1080,8 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
             return CNV_ERR_MALLOC;
         }
         pIOHanldeData->lConnectID = atoi((char *)pConnId);
-        memcpy(pIOHanldeData->strServIp, strClientIp, sizeof(pIOHanldeData->strServIp) - 1);
-        pIOHanldeData->ulPort = pSocketElement->uSockElement.tClnSockElement.tSvrSockData.lPort;
+        memcpy(pIOHanldeData->strServIp, pSocketElement->uSockElement.tClnSockElement.strClientIp, sizeof(pIOHanldeData->strServIp) - 1);
+        pIOHanldeData->ulPort = pSocketElement->uSockElement.tClnSockElement.uClientPort;
         pIOHanldeData->lDataLen = nPacketSize;
         pIOHanldeData->handle_io_eventfd = pIoThreadContext->handle_io_eventfd;
         pIOHanldeData->handle_io_msgque = pIoThreadContext->handle_io_msgque;
@@ -1111,14 +1091,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         pIOHanldeData->nReserveOne = pSocketElement->uSockElement.tClnSockElement.nReserveOne;
         pIOHanldeData->nReserverTwo = pSocketElement->uSockElement.tClnSockElement.nReserverTwo;
 
-        if(pIoThreadContext->nDistributeType == 0 || pIoThreadContext->nDistributeType == DISTRIBUTE_TYPE_WEIGHT)
-        {
-            io_select_handle_thread(pIoThreadContext, pIoThreadContext->szHandleContext, pIoThreadContext->queDistribute, &pHandleContext);
-        }
-        else if(pIoThreadContext->nDistributeType == DISTRIBUTE_TYPE_HASH)
-        {
-            pHandleContext = pIoThreadContext->szHandleContext[pIoThreadContext->szIoRespHandle[nDistributeValue % g_params.tConfigHandle.lNumberOfThread]];
-        }
+        io_select_handle_thread(pIoThreadContext, pIoThreadContext->szHandleContext, pIoThreadContext->queDistribute, &pHandleContext);
 
         nRet = lockfree_queue_enqueue(&(pHandleContext->io_handle_msgque), pIOHanldeData, 1);   //队列满了把数据丢掉,以免内存泄露
         if(nRet == false)
@@ -1253,7 +1226,11 @@ int netframe_init_io(IO_THREAD_ITEM   *pTheadparam)
     }
 
     //监控服务
-    ioset_monitor_callback(&pIoThreadContext->pfncnv_monitor_callback);  //回调函数
+    CALLBACK_STRUCT_T tCallback;
+    bzero(&tCallback, sizeof(tCallback));
+    snprintf(tCallback.strProtocol, sizeof(tCallback.strProtocol) - 1, "io_monitor");
+    set_callback_function(SERVER_CALLBACK_FUNC, &tCallback);
+    pIoThreadContext->pfncnv_monitor_callback = tCallback.pfncnv_monitor_callback;
 
     nRet = netframe_setblockopt(pIoThreadContext->timerfd_monitor, K_FALSE);
     if(nRet != CNV_ERR_OK)
