@@ -795,11 +795,6 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
             remove_client_socket_hashmap(pIoThreadContext->Epollfd, pIoThreadContext->HashConnidFd, pSocketElement->pConnId);
         }
 
-        if(pHandleIOData->pfn_handle_callback)
-        {
-            pHandleIOData->pfn_handle_callback(NULL, pHandleIOData->pCallbackPara);
-        }
-
         cnv_comm_Free(pHandleIOData->pDataSend);
         cnv_comm_Free(pHandleIOData);
     }

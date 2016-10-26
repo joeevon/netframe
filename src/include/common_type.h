@@ -103,9 +103,9 @@ extern "C"
 
     /*=======================================================
     功能:
-        定时触发回调函数
+        handle定时触发回调函数
      =========================================================*/
-    typedef void (*pfnCNV_CALLBACK_FUNCTION)(CNV_UNBLOCKING_QUEUE *queuerespond, void *CallbakParam);
+    typedef void (*pfnCNV_HANDLE_CALLBACK)(struct __AUXILIARY_QUEQUE_DATA **ptAuxiQueData, void *pBusiHandleParam);
 
     /*=======================================================
     功能:
@@ -207,7 +207,6 @@ extern "C"
         char *pDataSend;  //要发送的数据
         void *pCallbackPara;   //回调参数
         int io_thread_index;  //IO线程ID
-        pfnCNV_CALLBACK_FUNCTION pfn_handle_callback;  //handle给io的回调函数
         pfnSEND_FAILED_CALLBACK pfnsend_failed_callback;   //发送失败回调函数
         int nReserveOne;   //保留变量
         int nReserverTwo;   //保留变量
@@ -248,7 +247,7 @@ extern "C"
     {
         TIMER_STRUCT  tTimer;
         char strTaskName[64];
-        pfnCNV_CALLBACK_FUNCTION  pfn_timertask_cb;   //定时任务回调函数
+        pfnCNV_HANDLE_CALLBACK  pfn_timertask_cb;   //定时任务回调函数
     } HANDLE_TIMER_TASK;
 
     //handle线程参数

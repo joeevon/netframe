@@ -292,7 +292,7 @@ extern "C"
     typedef  struct  _TIMER_TASK_STRUCT
     {
         int timerfd;
-        pfnCNV_CALLBACK_FUNCTION  pfnCALLBACK_FUNCTION;
+        pfnCNV_HANDLE_CALLBACK  pfnHADLE_CALLBACK;
     } TIMER_TASK_STRUCT;
 
     // 全局配置

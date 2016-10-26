@@ -29,6 +29,7 @@
 #include <errno.h>
 
 extern IO_THREAD_CONTEXT g_szIoThreadContexts[MAX_IO_THREAD];
+extern AUXILIARY_THREAD_CONTEXT g_szAuxiliaryContext[MAX_AUXILIARY_THREAD];
 
 K_BOOL earase_hashtimer_callback(void  *pKey, void  *pValue, void  *pContext, K_BOOL *bIsEarase)
 {
@@ -170,7 +171,7 @@ int netframe_init_handle(HANDLE_THREAD_ITEM *pTheadparam)
             void *pOutValue = NULL;
             if(cnv_hashmap_get(pHandleContext->HashTimerTask, ptTimerTask->strTaskName, &pOutValue) == K_SUCCEED)     //重复的任务名
             {
-                LOG_SYS_ERROR("dump duplicated taskname!");
+                LOG_SYS_ERROR("duplicated taskname!");
                 return -1;
             }
 
@@ -190,7 +191,7 @@ int netframe_init_handle(HANDLE_THREAD_ITEM *pTheadparam)
                 cnv_comm_Free(pHashKey);
                 return CNV_ERR_MALLOC;
             }
-            ptTimerTaskStr->pfnCALLBACK_FUNCTION = ptTimerTask->pfn_timertask_cb;
+            ptTimerTaskStr->pfnHADLE_CALLBACK = ptTimerTask->pfn_timertask_cb;
             ptTimerTaskStr->timerfd = timerfd_create(CLOCK_REALTIME, 0);
 
             HASHMAP_VALUE *pHashValue = (HASHMAP_VALUE *)cnv_comm_Malloc(sizeof(HASHMAP_VALUE));
@@ -274,10 +275,15 @@ int  handle_thread_run(void *pThreadParameter)
                             HASHMAP_VALUE *pHashValue = (HASHMAP_VALUE *)pOutValue;
                             TIMER_TASK_STRUCT *ptCbFunctionStr = (TIMER_TASK_STRUCT *)pHashValue->pValue;
                             nRet = read(ptCbFunctionStr->timerfd, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
-                            if(ptCbFunctionStr->pfnCALLBACK_FUNCTION)
+
+                            AUXILIARY_QUEQUE_DATA *ptAuxiQueData = NULL;
+                            ptCbFunctionStr->pfnHADLE_CALLBACK(&ptAuxiQueData, pHandleParams->pBusinessParams);
+                            int nRet = lockfree_queue_enqueue(&(g_szAuxiliaryContext[0].poll_msgque), ptAuxiQueData, 1);   //队列满了把数据丢掉,以免内存泄露
+                            if(nRet == false)
                             {
-                                ptCbFunctionStr->pfnCALLBACK_FUNCTION(&pHandleContext->queuerespond, pHandleParams->pBusinessParams);
-                                //定时后的操作
+                                LOG_SYS_ERROR("auxiliary queue is full!");
+                                cnv_comm_Free(ptAuxiQueData->pData);
+                                cnv_comm_Free(ptAuxiQueData);
                             }
                         }
                     }
