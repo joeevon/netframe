@@ -1359,6 +1359,7 @@ void  io_thread_uninit(IO_THREAD_CONTEXT *pIoThreadContexts)
 {
     free_server_unblock_queue(pIoThreadContexts[0].queServer);  //服务的配置队列,框架公用,释放一次即可
     cnv_comm_Free(pIoThreadContexts[0].queServer);
+    pIoThreadContexts[0].queServer = NULL;
     for(int i = 0; i < g_params.tConfigIO.lNumberOfThread; i++)
     {
         IO_THREAD_CONTEXT  *pIoThreadContext = &pIoThreadContexts[i];

@@ -303,7 +303,7 @@ int  netframe_init_accept(ACCEPT_THREAD_CONTEXT  *pAcceptContext, NETFRAME_CONFI
     return  CNV_ERR_OK;
 }
 
-int  accept_thread_run(void *pThreadParameter)
+int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
 {
     int nCount = -1;
     uint64_t ulWakeup = 1;   //任意值,无实际意义
@@ -313,7 +313,6 @@ int  accept_thread_run(void *pThreadParameter)
     memset(&tClientAddr, 0x00, sizeof(struct sockaddr_in));
     struct epoll_event szEpollEvent[DEFAULF_EPOLL_SIZE];
     memset(szEpollEvent, 0x00, sizeof(szEpollEvent));
-    NETFRAME_CONFIG_ACCEPT *pThreadparam = (NETFRAME_CONFIG_ACCEPT *)pThreadParameter;
     ACCEPT_THREAD_CONTEXT  *pAcceptContext = pThreadparam->pAcceptContext;
     IO_THREAD_CONTEXT *pIoThreadContexts = pAcceptContext->pIoThreadContexts;
     void *HashFdListen = pAcceptContext->HashFdListen;
@@ -529,7 +528,12 @@ int  accept_thread_start(IO_THREAD_CONTEXT *pIoThreadContexts, ACCEPT_THREAD_CON
         {
             return nRet;
         }
-        nRet = hmi_plat_CreateThread((pfnCNV_PLAT_THREAD_RECALL)accept_thread_run, &g_params.tConfigAccept, 0, &g_params.tConfigAccept.ulThreadId, &g_params.tConfigAccept.ThreadHandle);
+
+        nRet = accept_thread_run(&g_params.tConfigAccept);
+        if(nRet != 0)
+        {
+            return nRet;
+        }
         LOG_SYS_INFO("accept thread start result:%d", nRet);
     }
 
