@@ -29,7 +29,7 @@
 #include <errno.h>
 
 extern IO_THREAD_CONTEXT g_szIoThreadContexts[MAX_IO_THREAD];
-extern AUXILIARY_THREAD_CONTEXT g_szAuxiliaryContext[MAX_AUXILIARY_THREAD];
+extern ACCEPT_THREAD_CONTEXT g_tAcceptContext;
 
 K_BOOL earase_hashtimer_callback(void  *pKey, void  *pValue, void  *pContext, K_BOOL *bIsEarase)
 {
@@ -238,14 +238,13 @@ int  handle_thread_run(void *pThreadParameter)
 {
     int i = 0;
     uint64_t ulData = 0;
-    int nCount = -1;   //epoll个数
     struct epoll_event szEpollEvent[DEFAULF_EPOLL_SIZE];
+    bzero(szEpollEvent, sizeof(szEpollEvent));
     HANDLE_THREAD_ITEM *pTheadparam = (HANDLE_THREAD_ITEM *)pThreadParameter;
     HANDLE_THREAD_CONTEXT *pHandleContext = pTheadparam->pHandleContext;
     HANDLE_PARAMS *pHandleParams = (HANDLE_PARAMS *)pHandleContext->pHandleParam;
     int Epollfd = pHandleContext->Epollfd;
     int  EventfdIo = pHandleContext->io_handle_eventfd;    //io唤醒
-    bzero(szEpollEvent, sizeof(struct epoll_event)*DEFAULF_EPOLL_SIZE);
 
     int nRet = netframe_init_handle(pTheadparam);
     if(nRet != CNV_ERR_OK)
@@ -256,7 +255,7 @@ int  handle_thread_run(void *pThreadParameter)
 
     while(1)
     {
-        nCount = epoll_wait(Epollfd, szEpollEvent, DEFAULF_EPOLL_SIZE, -1);
+        int nCount = epoll_wait(Epollfd, szEpollEvent, DEFAULF_EPOLL_SIZE, -1);
         if(nCount > 0)
         {
             for(i = 0; i < nCount; i++)
@@ -276,14 +275,21 @@ int  handle_thread_run(void *pThreadParameter)
                             TIMER_TASK_STRUCT *ptCbFunctionStr = (TIMER_TASK_STRUCT *)pHashValue->pValue;
                             nRet = read(ptCbFunctionStr->timerfd, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
 
-                            AUXILIARY_QUEQUE_DATA *ptAuxiQueData = NULL;
-                            ptCbFunctionStr->pfnHADLE_CALLBACK(&ptAuxiQueData, pHandleParams->pBusinessParams);
-                            int nRet = lockfree_queue_enqueue(&(g_szAuxiliaryContext[0].poll_msgque), ptAuxiQueData, 1);   //队列满了把数据丢掉,以免内存泄露
+                            STATISTICS_QUEQUE_DATA *ptStatisQueData = NULL;
+                            ptCbFunctionStr->pfnHADLE_CALLBACK(&ptStatisQueData, pHandleParams->pBusinessParams);
+                            int nRet = lockfree_queue_enqueue(&(g_tAcceptContext.statis_msgque), ptStatisQueData, 1);   //队列满了把数据丢掉,以免内存泄露
                             if(nRet == false)
                             {
                                 LOG_SYS_ERROR("auxiliary queue is full!");
-                                cnv_comm_Free(ptAuxiQueData->pData);
-                                cnv_comm_Free(ptAuxiQueData);
+                                cnv_comm_Free(ptStatisQueData->pData);
+                                cnv_comm_Free(ptStatisQueData);
+                            }
+
+                            uint64_t ulWakeup = 1;   //任意值,无实际意义
+                            nRet = write(g_tAcceptContext.accept_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒handle
+                            if(nRet != sizeof(ulWakeup))
+                            {
+                                LOG_SYS_FATAL("io wake up accept failed !");
                             }
                         }
                     }
@@ -305,6 +311,8 @@ int  handle_thread_run(void *pThreadParameter)
                     LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
                 }
             }
+
+            bzero(szEpollEvent, sizeof(struct epoll_event)*nCount);
         }
         else if(nCount < 0)
         {

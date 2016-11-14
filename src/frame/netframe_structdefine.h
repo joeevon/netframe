@@ -108,7 +108,6 @@ extern "C"
         CNV_BLOCKING_QUEUE  *handle_io_msgque;    //handle -> io
         CNV_UNBLOCKING_QUEUE  *handle_msgque_one;    //handle -> io  self
         CNV_UNBLOCKING_QUEUE  *handle_msgque_two;    //handle -> io  self
-        struct epoll_event  *EpollEvent;
         HANDLE_THREAD_CONTEXT  *szHandleContext[MAX_HANDLE_THREAD];
         pfnCNV_MONITOR_CALLBACK  pfncnv_monitor_callback;
         MONITOR_ELEMENT tMonitorElement;
@@ -134,32 +133,6 @@ extern "C"
         int lHandleIoMsgSize;
         IO_THREAD_ITEM szConfigIOItem[MAX_IO_THREAD];
     } NETFRAME_CONFIG_IO;
-
-    //AUXILIARY CONTEXT
-    typedef struct  __AUXILIARY_THREAD_CONTEXT
-    {
-        short threadindex;
-        char threadname[20];
-        LOCKFREE_QUEUE  poll_msgque;
-        CNV_UNBLOCKING_QUEUE queuerespond;   //返回IO的数据
-    } AUXILIARY_THREAD_CONTEXT;
-
-    //AUXILIARY ITEM
-    typedef  struct  __AUXILIARY_THREAD_ITEM
-    {
-        int  lThreadIndex;     //开启线时自定义的序号
-        char strThreadName[DEFAULT_ARRAY_SIZE];
-        pthread_t ulThreadId;    //线程ID
-        void *ThreadHandle;
-        AUXILIARY_THREAD_CONTEXT *pAuxiliaryThreadContext;
-    } AUXILIARY_THREAD_ITEM;
-
-    //AUXILIARY CONFIG
-    typedef  struct  __NETFRAME_CONFIG_AUXILIARY
-    {
-        int lNumberOfThread;
-        AUXILIARY_THREAD_ITEM szConfigAuxiliaryItem[MAX_AUXILIARY_THREAD];
-    } NETFRAME_CONFIG_AUXILIARY;
 
     //HOST
     typedef struct  __NETFRAME_HOST
@@ -197,10 +170,14 @@ extern "C"
         int UdpSocket;
         int UnixListenSocket;
         int  Epollfd;
+        int  accept_eventfd;  //其他线程唤醒
         void *HashFdListen;      //  key:socket  value:listen item
+        CALLBACK_STRUCT_T  tStatisCallback;  //数据统计回调函数
         CNV_UNBLOCKING_QUEUE *queEventfds;  //需要唤醒队列的fd
         IO_THREAD_CONTEXT *pIoThreadContexts;
         ACCEPT_THREAD_ITEM  *pConfigAcceptItem;
+        LOCKFREE_QUEUE  statis_msgque;  //统计数据的队列
+        CNV_UNBLOCKING_QUEUE queStatisData;  //统计数据返回的消息队列
     } ACCEPT_THREAD_CONTEXT;
 
     // ACCEPT CONFIG
@@ -302,7 +279,6 @@ extern "C"
         NETFRAME_CONFIG_ACCEPT  tConfigAccept;
         NETFRAME_CONFIG_IO  tConfigIO;
         NETFRAME_CONFIG_HANDLE  tConfigHandle;
-        NETFRAME_CONFIG_AUXILIARY tConfigAuxiliary;
         TIMER_STRUCT  tHeartBeat;
         TIMER_STRUCT  tSocketClear;
         TIMER_STRUCT  tMonitor;

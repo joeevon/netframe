@@ -265,45 +265,6 @@ int netframe_init_config()
     }
     //====================END OF HANDLE THREADS======================
 
-    //========================AUXILIARY THREADS=========================
-    xmlNodePtr ptNodeAuxiliary = NULL;
-    xmlNodePtr ptNodeName = NULL;
-    lIndex = 0;
-    ptNodeItem = NULL;
-
-    ptNodeAuxiliary = ptNodeRoot->xmlChildrenNode;
-    while(ptNodeAuxiliary)
-    {
-        if(!xmlStrcmp(ptNodeAuxiliary->name, BAD_CAST"auxiliary_thread"))
-        {
-            ptNodeName = ptNodeAuxiliary->xmlChildrenNode;
-            while(ptNodeName)
-            {
-                if(!xmlStrcmp(ptNodeName->name, BAD_CAST"auxiliary"))
-                {
-                    ptNodeItem = ptNodeName->xmlChildrenNode;
-                    while(ptNodeItem)
-                    {
-                        pItemVaule = (char *)xmlNodeGetContent(ptNodeItem);
-
-                        if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"name"))
-                        {
-                            snprintf(g_params.tConfigAuxiliary.szConfigAuxiliaryItem[lIndex].strThreadName, sizeof(g_params.tConfigAuxiliary.szConfigAuxiliaryItem[lIndex].strThreadName) - 1, "%s", pItemVaule);
-                        }
-
-                        xmlFree(pItemVaule);
-                        ptNodeItem = ptNodeItem->next;
-                    }
-                    lIndex++;
-                    g_params.tConfigAuxiliary.lNumberOfThread++;
-                }
-                ptNodeName = ptNodeName->next;
-            }
-        }
-        ptNodeAuxiliary = ptNodeAuxiliary->next;
-    }
-    //====================END OF AUXILIARY THREADS======================
-
     //=====================HEART BEAT============================
     xmlNodePtr  ptNodeHeartBeat = NULL;
     ptNodeItem = NULL;

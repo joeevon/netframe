@@ -26,6 +26,76 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
+#include <sys/eventfd.h>
+
+extern IO_THREAD_CONTEXT g_szIoThreadContexts[MAX_IO_THREAD];
+
+void  free_accept_lockfreequeue(LOCKFREE_QUEUE  *statis_msgque)
+{
+    STATISTICS_QUEQUE_DATA *ptStatisQueData = NULL;
+    int nCount = lockfree_queue_len(statis_msgque);
+    while(nCount--)
+    {
+        ptStatisQueData = (STATISTICS_QUEQUE_DATA *)lockfree_queue_dequeue(statis_msgque, 1);
+        free(ptStatisQueData->pData);
+        free(ptStatisQueData);
+    }
+}
+
+void statistics_data(int nAcceptFd, ACCEPT_THREAD_CONTEXT *pAcceptContext)
+{
+    int nRet = 0;
+
+    STATISTICS_QUEQUE_DATA *ptStatisQueData = (STATISTICS_QUEQUE_DATA *)lockfree_queue_dequeue(&pAcceptContext->statis_msgque, 1);
+    if(ptStatisQueData == NULL)
+    {
+        return;
+    }
+
+    if(pAcceptContext->tStatisCallback.pfncnv_statistics_callback != NULL)
+    {
+        pAcceptContext->tStatisCallback.pfncnv_statistics_callback(ptStatisQueData, &(pAcceptContext->queStatisData));
+    }
+
+    uint64_t ulWakeup = 1;  //任意值,无实际意义
+    K_BOOL bIsWakeIO = K_FALSE;
+    int nNumOfPostMsg = get_unblock_queue_count(&(pAcceptContext->queStatisData));
+    LOG_SYS_DEBUG("nNumOfPostMsg = %d", nNumOfPostMsg);
+    while(nNumOfPostMsg--)      // handle线程单独用的队列,无需加锁
+    {
+        void *pPostData = poll_unblock_queue_head(&(pAcceptContext->queStatisData));
+        nRet = push_block_queue_tail(g_szIoThreadContexts[0].handle_io_msgque, pPostData, 1);  //队列满了把数据丢掉,以免内存泄露
+        if(nRet == false)
+        {
+            LOG_SYS_ERROR("handle_io queue is full!");
+            HANDLE_TO_IO_DATA *pHandleIOData = (HANDLE_TO_IO_DATA *)pPostData;
+            free(pHandleIOData->pDataSend);
+            free(pHandleIOData);
+            continue;
+        }
+        bIsWakeIO = true;
+    }
+
+    if(bIsWakeIO)
+    {
+        nRet = write(g_szIoThreadContexts[0].handle_io_eventfd, &ulWakeup, sizeof(ulWakeup));  //handle唤醒io
+        if(nRet != sizeof(ulWakeup))
+        {
+            LOG_SYS_ERROR("handle wake io failed.");
+        }
+        bIsWakeIO = K_FALSE;
+    }
+
+    cnv_comm_Free(ptStatisQueData->pData);
+    cnv_comm_Free(ptStatisQueData);
+
+
+    if(lockfree_queue_len(&pAcceptContext->statis_msgque) <= 0)
+    {
+        uint64_t ulData = 0;
+        nRet = read(nAcceptFd, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
+    }
+}
 
 int  accept_select_io_thread(ACCEPT_THREAD_ITEM *pAcceptItem, IO_THREAD_CONTEXT **pIoThreadContext, CNV_UNBLOCKING_QUEUE *queEventfds)
 {
@@ -45,7 +115,7 @@ int  accept_select_io_thread(ACCEPT_THREAD_ITEM *pAcceptItem, IO_THREAD_CONTEXT 
     }
 
     snprintf(strKey, sizeof(strKey) - 1, "%d", lIndex);
-    nRet = iterator_unblock_queuqe(queEventfds, queue_search_int, strKey);  // 避免重复唤醒
+    nRet = iterator_unblock_queuqe(queEventfds, queue_search_int, strKey);  //避免重复唤醒
     if(!nRet)    //原来的队列中不存在
     {
         char *pEventIndex = (char *)cnv_comm_Malloc(sizeof(int));
@@ -118,6 +188,67 @@ int accept_get_portinfo(int ServerFd, void *HashFdListen, ACCEPT_THREAD_ITEM **p
     }
     HASHMAP_VALUE  *pHashValue = (HASHMAP_VALUE *)pOutValue;
     *pAcceptItem = (ACCEPT_THREAD_ITEM *)(pHashValue->pValue);
+
+    return CNV_ERR_OK;
+}
+
+int accept_client_connect(int nServerFd, ACCEPT_THREAD_CONTEXT *pAcceptContext, CNV_UNBLOCKING_QUEUE *queEventfds)
+{
+    int nRet = 0;
+    int  nClientfd = 0;
+    socklen_t  nClientLen = sizeof(struct sockaddr_in);
+    struct sockaddr_in  tClientAddr;
+    memset(&tClientAddr, 0x00, sizeof(struct sockaddr_in));
+
+    nClientfd = accept4(nServerFd, (struct sockaddr *)&tClientAddr, &nClientLen, SOCK_NONBLOCK | SOCK_CLOEXEC);
+    if(nClientfd == -1)
+    {
+        LOG_SYS_ERROR("%s.", strerror(errno));
+        return -1;
+    }
+    LOG_SYS_DEBUG("accept, client ip:%s, socket = %d", inet_ntoa(tClientAddr.sin_addr), nClientfd);
+
+    ACCEPT_THREAD_ITEM *pAcceptItem = NULL;
+    nRet = accept_get_portinfo(nServerFd, pAcceptContext->HashFdListen, &pAcceptItem);
+    if(nRet != CNV_ERR_OK)
+    {
+        LOG_SYS_ERROR("accept_get_portinfo error!");
+        netframe_close_socket(nClientfd);
+        return -1;
+    }
+
+    nRet = accept_filter_client(pAcceptItem, &tClientAddr);
+    if(nRet != 0)
+    {
+        LOG_SYS_ERROR("not allowed client, ip:%s", inet_ntoa(tClientAddr.sin_addr));
+        netframe_close_socket(nClientfd);
+        return -1;
+    }
+
+    ACCEPT_TO_IO_DATA  tAcceptIOData = { 0 };
+    nRet = accept_set_iodata(nClientfd, pAcceptItem, &tClientAddr, &tAcceptIOData);   //写入IO队列的数据
+    if(nRet != CNV_ERR_OK)
+    {
+        LOG_SYS_ERROR("accept_set_iodata error!");
+        netframe_close_socket(nClientfd);
+        return -1;
+    }
+
+    IO_THREAD_CONTEXT *pIoThreadContext = NULL;
+    nRet = accept_select_io_thread(pAcceptItem, &pIoThreadContext, queEventfds);  //选择IO线程
+    if(nRet != CNV_ERR_OK)
+    {
+        netframe_close_socket(nClientfd);
+        return -1;
+    }
+
+    nRet = cnv_fifo_put(pIoThreadContext->accept_io_msgque, (unsigned char *)&tAcceptIOData, sizeof(ACCEPT_TO_IO_DATA));
+    if(nRet == 0)
+    {
+        LOG_SYS_ERROR("cnv_fifo_put error!");
+        netframe_close_socket(nClientfd);
+        return -1;
+    }
 
     return CNV_ERR_OK;
 }
@@ -300,27 +431,39 @@ int  netframe_init_accept(ACCEPT_THREAD_CONTEXT  *pAcceptContext, NETFRAME_CONFI
         }
     }
 
+    //监听accept_eventfd
+    nRet = netframe_setblockopt(pAcceptContext->accept_eventfd, K_FALSE);
+    if(nRet != CNV_ERR_OK)
+    {
+        LOG_SYS_FATAL("netframe_setblockopt failed!");
+        return  nRet;
+    }
+
+    nRet = netframe_add_readevent(pAcceptContext->Epollfd, pAcceptContext->accept_eventfd, NULL);
+    if(nRet != CNV_ERR_OK)
+    {
+        LOG_SYS_FATAL("netframe_add_readevent failed!");
+        return  nRet;
+    }
+
+    snprintf(pAcceptContext->tStatisCallback.strProtocol, sizeof(pAcceptContext->tStatisCallback.strProtocol) - 1, "statistics");
+    set_callback_function(SERVER_CALLBACK_FUNC, &pAcceptContext->tStatisCallback);
+
     return  CNV_ERR_OK;
 }
 
 int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
 {
-    int nCount = -1;
     uint64_t ulWakeup = 1;   //任意值,无实际意义
-    int lClientfd = 0;
-    socklen_t lClientLen = sizeof(struct sockaddr_in);
-    struct sockaddr_in tClientAddr;
-    memset(&tClientAddr, 0x00, sizeof(struct sockaddr_in));
     struct epoll_event szEpollEvent[DEFAULF_EPOLL_SIZE];
-    memset(szEpollEvent, 0x00, sizeof(szEpollEvent));
-    ACCEPT_THREAD_CONTEXT  *pAcceptContext = pThreadparam->pAcceptContext;
+    bzero(szEpollEvent, sizeof(szEpollEvent));
+    ACCEPT_THREAD_CONTEXT *pAcceptContext = pThreadparam->pAcceptContext;
     IO_THREAD_CONTEXT *pIoThreadContexts = pAcceptContext->pIoThreadContexts;
-    void *HashFdListen = pAcceptContext->HashFdListen;
-    CNV_UNBLOCKING_QUEUE  *queEventfds = pAcceptContext->queEventfds;  //需要唤醒的队列
-    IO_THREAD_CONTEXT *pIoThreadContext = NULL;
-    ACCEPT_TO_IO_DATA  AcceptIOData = { 0 };
+    CNV_UNBLOCKING_QUEUE *queEventfds = pAcceptContext->queEventfds;  //需要唤醒的队列
+    int Epollfd = pAcceptContext->Epollfd;
+    int AcceptFd = pAcceptContext->accept_eventfd;
 
-    int nRet = netframe_init_accept(pAcceptContext, pThreadparam, HashFdListen);
+    int nRet = netframe_init_accept(pAcceptContext, pThreadparam, pAcceptContext->HashFdListen);
     if(nRet != CNV_ERR_OK)
     {
         LOG_SYS_FATAL("netframe_init_accept failed!");
@@ -333,79 +476,45 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
 
     while(1)
     {
-        nCount = epoll_wait(pAcceptContext->Epollfd, szEpollEvent, DEFAULF_EPOLL_SIZE, -1);
+        int nCount = epoll_wait(Epollfd, szEpollEvent, DEFAULF_EPOLL_SIZE, -1);
         if(nCount > 0)
         {
             for(int i = 0; i < nCount; i++)
             {
-                if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))
-                {
-                    LOG_SYS_ERROR("%s", strerror(errno));
-                }
-                if(szEpollEvent[i].events & POLLNVAL)
-                {
-                    LOG_SYS_ERROR("%s", strerror(errno));
-                }
-                if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
-                {
-                    LOG_SYS_ERROR("%s", strerror(errno));
-                }
                 if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))
                 {
-                    lClientfd = accept4(szEpollEvent[i].data.fd, (struct sockaddr *)&tClientAddr, &lClientLen, SOCK_NONBLOCK | SOCK_CLOEXEC);
-                    if(lClientfd == -1)
+                    if(szEpollEvent[i].data.fd == AcceptFd)  //统计数据
                     {
-                        LOG_SYS_ERROR("%s.", strerror(errno));
-                        continue;
+                        statistics_data(szEpollEvent[i].data.fd, pAcceptContext);
                     }
-                    LOG_SYS_DEBUG("accept, client ip:%s, socket = %d", inet_ntoa(tClientAddr.sin_addr), lClientfd);
-
-                    ACCEPT_THREAD_ITEM *pAcceptItem = NULL;
-                    nRet = accept_get_portinfo(szEpollEvent[i].data.fd, HashFdListen, &pAcceptItem);
-                    if(nRet != CNV_ERR_OK)
+                    else    //客户端连接
                     {
-                        LOG_SYS_ERROR("accept_get_portinfo error!");
-                        netframe_close_socket(lClientfd);
-                        continue;
+                        nRet = accept_client_connect(szEpollEvent[i].data.fd, pAcceptContext, queEventfds);
+                        if(nRet != 0)
+                        {
+                            continue;
+                        }
                     }
-
-                    nRet = accept_filter_client(pAcceptItem, &tClientAddr);
-                    if(nRet != 0)
-                    {
-                        LOG_SYS_ERROR("not allowed client, ip:%s", inet_ntoa(tClientAddr.sin_addr));
-                        netframe_close_socket(lClientfd);
-                        continue;
-                    }
-
-                    memset(&AcceptIOData, 0, sizeof(ACCEPT_TO_IO_DATA));
-                    nRet = accept_set_iodata(lClientfd, pAcceptItem, &tClientAddr, &AcceptIOData);   //写入IO队列的数据
-                    if(nRet != CNV_ERR_OK)
-                    {
-                        LOG_SYS_ERROR("accept_set_iodata error!");
-                        netframe_close_socket(lClientfd);
-                        continue;
-                    }
-
-                    nRet = accept_select_io_thread(pAcceptItem, &pIoThreadContext, queEventfds);  //选择线程
-                    if(nRet != CNV_ERR_OK)
-                    {
-                        netframe_close_socket(lClientfd);
-                        continue;
-                    }
-
-                    nRet = cnv_fifo_put(pIoThreadContext->accept_io_msgque, (unsigned char *)&AcceptIOData, sizeof(ACCEPT_TO_IO_DATA));
-                    if(nRet == 0)
-                    {
-                        LOG_SYS_ERROR("cnv_fifo_put error!");
-                        netframe_close_socket(lClientfd);
-                        continue;
-                    }
+                }
+                else if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))
+                {
+                    LOG_SYS_ERROR("%s", strerror(errno));
+                }
+                else if(szEpollEvent[i].events & POLLNVAL)
+                {
+                    LOG_SYS_ERROR("%s", strerror(errno));
+                }
+                else if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
+                {
+                    LOG_SYS_ERROR("%s", strerror(errno));
                 }
                 else
                 {
                     LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
                 }
             }
+
+            bzero(szEpollEvent, sizeof(struct epoll_event)*nCount);
         }
         else if(nCount < 0)
         {
@@ -430,6 +539,7 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
             cnv_comm_Free(pEventIndex);
         }
     }
+
     return nRet;
 }
 
@@ -455,23 +565,27 @@ int accept_set_io_context(ACCEPT_THREAD_ITEM *pConfigAcceptItem, IO_THREAD_CONTE
     return  CNV_ERR_OK;
 }
 
-void  accept_thread_uninit(ACCEPT_THREAD_CONTEXT *pAcceptContexts)
+void  accept_thread_uninit(ACCEPT_THREAD_CONTEXT *pAcceptContext)
 {
     int  i = 0;
-    int Epollfd = pAcceptContexts->Epollfd;
+    int Epollfd = pAcceptContext->Epollfd;
 
     for(i = 0; i < g_params.tConfigAccept.lNumberOfPort; ++i)
     {
-        free_unblock_queue(pAcceptContexts->pConfigAcceptItem[i].queDistribute);
-        cnv_comm_Free(pAcceptContexts->pConfigAcceptItem[i].queDistribute);
+        free_unblock_queue(pAcceptContext->pConfigAcceptItem[i].queDistribute);
+        cnv_comm_Free(pAcceptContext->pConfigAcceptItem[i].queDistribute);
     }
-    free_unblock_queue(pAcceptContexts->queEventfds);
-    cnv_comm_Free(pAcceptContexts->queEventfds);
-    cnv_hashmap_free_socket(pAcceptContexts->HashFdListen, &Epollfd);
-    netframe_close_socket(pAcceptContexts->TcpListenSocket);
-    netframe_close_socket(pAcceptContexts->UnixListenSocket);
-    netframe_close_socket(pAcceptContexts->UdpSocket);
-    close(pAcceptContexts->Epollfd);
+    free_unblock_queue(pAcceptContext->queEventfds);
+    cnv_comm_Free(pAcceptContext->queEventfds);
+    cnv_hashmap_free_socket(pAcceptContext->HashFdListen, &Epollfd);
+    netframe_close_socket(pAcceptContext->TcpListenSocket);
+    netframe_close_socket(pAcceptContext->UnixListenSocket);
+    netframe_close_socket(pAcceptContext->UdpSocket);
+    free_accept_lockfreequeue(&(pAcceptContext->statis_msgque));
+    lockfree_queue_uninit(&(pAcceptContext->statis_msgque));
+    destory_unblock_queue(&(pAcceptContext->queStatisData));
+    close(pAcceptContext->accept_eventfd);
+    close(pAcceptContext->Epollfd);
 }
 
 int  accept_thread_init(NETFRAME_CONFIG_ACCEPT *ptConfigAccept, IO_THREAD_CONTEXT *pIoThreadContexts, ACCEPT_THREAD_CONTEXT *pAcceptContext)
@@ -480,6 +594,9 @@ int  accept_thread_init(NETFRAME_CONFIG_ACCEPT *ptConfigAccept, IO_THREAD_CONTEX
     int  i = 0;
     pAcceptContext->pIoThreadContexts = pIoThreadContexts;
     netframe_create_epoll(&(pAcceptContext->Epollfd), 5);
+    pAcceptContext->accept_eventfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    initiate_unblock_queue(&(pAcceptContext->queStatisData), DEFAULT_QUEUE_CAPCITY);   //统计数据返回的消息队列
+    lockfree_queue_init(&(pAcceptContext->statis_msgque), 1000);
     pAcceptContext->queEventfds = (CNV_UNBLOCKING_QUEUE *)cnv_comm_Malloc(sizeof(CNV_UNBLOCKING_QUEUE));
     if(!pAcceptContext->queEventfds)
     {

@@ -66,7 +66,7 @@ extern "C"
 
     struct  __IO_TO_HANDLE_DATA;
     struct __HANDLE_TO_IO_DATA;
-    struct __AUXILIARY_QUEQUE_DATA;
+    struct __STATISTICS_QUEQUE_DATA;
 
     /*=======================================================
     功能:
@@ -99,13 +99,13 @@ extern "C"
         queuerespond里的数据有业务申请内存，框架释放
     参数:
     =========================================================*/
-    typedef void(*pfnCNV_AUXILIARY_CALLBACK)(const struct __AUXILIARY_QUEQUE_DATA *ptAuxiQueData, CNV_UNBLOCKING_QUEUE *queuerespond);
+    typedef void(*pfnCNV_STATISTICS_CALLBACK)(const struct __STATISTICS_QUEQUE_DATA *ptStatisQueData, CNV_UNBLOCKING_QUEUE *queuerespond);
 
     /*=======================================================
     功能:
         handle定时触发回调函数
      =========================================================*/
-    typedef void (*pfnCNV_HANDLE_CALLBACK)(struct __AUXILIARY_QUEQUE_DATA **ptAuxiQueData, void *pBusiHandleParam);
+    typedef void (*pfnCNV_HANDLE_CALLBACK)(struct __STATISTICS_QUEQUE_DATA **ptStatisQueData, void *pBusiHandleParam);
 
     /*=======================================================
     功能:
@@ -120,7 +120,7 @@ extern "C"
         此处是io调用的回调函数，用handle给io的结构体也使用，便于请求服务的处理
         ptHandleIoData由业务申请内存，框架释放
     =========================================================*/
-    typedef void(*pfnCNV_MONITOR_CALLBACK)(MONITOR_ELEMENT *ptMonitorElement, struct __AUXILIARY_QUEQUE_DATA **ptAuxiQueData);
+    typedef void(*pfnCNV_MONITOR_CALLBACK)(MONITOR_ELEMENT *ptMonitorElement, struct __STATISTICS_QUEQUE_DATA **ptStatisQueData);
 
     /*=======================================================
     功能:
@@ -160,7 +160,7 @@ extern "C"
         pfnCNV_PARSE_PROTOCOL pfncnv_parse_protocol;
         pfnCNV_HANDLE_BUSINESS pfncnv_handle_business;
         pfnCNV_MONITOR_CALLBACK pfncnv_monitor_callback;
-        pfnCNV_AUXILIARY_CALLBACK pfncnv_auxiliary_callback;
+        pfnCNV_STATISTICS_CALLBACK pfncnv_statistics_callback;
     } CALLBACK_STRUCT_T;
 
     typedef  struct  __SERVER_SOCKET_DATA
@@ -212,12 +212,12 @@ extern "C"
         int nReserverTwo;   //保留变量
     } HANDLE_TO_IO_DATA;
 
-    //AUXILIARY QUEUE DATA
-    typedef struct __AUXILIARY_QUEQUE_DATA
+    //STATISTICS QUEUE DATA
+    typedef struct __STATISTICS_QUEQUE_DATA
     {
         char *pData;
         int32_t nDataLen;
-    } AUXILIARY_QUEQUE_DATA;
+    } STATISTICS_QUEQUE_DATA;
 
     //TIMER STRUCT
     typedef struct  __TIMER_STRUCT

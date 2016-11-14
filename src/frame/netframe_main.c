@@ -16,15 +16,14 @@
 #include "netframe_io.h"
 #include "netframe_handle.h"
 #include "netframe_accept.h"
-#include "netframe_auxiliary.h"
 #include "cnv_thread.h"
 #include "cnv_comm.h"
 #include <signal.h>
 
 GLOBAL_PARAMS  g_params;      //全局配置参数
+ACCEPT_THREAD_CONTEXT g_tAcceptContext;
 IO_THREAD_CONTEXT g_szIoThreadContexts[MAX_IO_THREAD];
 HANDLE_THREAD_CONTEXT  g_szHandleContexts[MAX_HANDLE_THREAD];
-AUXILIARY_THREAD_CONTEXT g_szAuxiliaryContext[MAX_AUXILIARY_THREAD];
 
 void  netframe_pthread_join()
 {
@@ -44,11 +43,6 @@ void  netframe_pthread_join()
     {
         pthread_join(g_params.tConfigIO.szConfigIOItem[i].ulThreadId, (void **)0);
     }
-
-    for(i = 0; i < g_params.tConfigAuxiliary.lNumberOfThread; i++)
-    {
-        pthread_join(g_params.tConfigAuxiliary.szConfigAuxiliaryItem[i].ulThreadId, (void **)0);
-    }
 }
 
 void netframe_pthread_stop()
@@ -58,11 +52,6 @@ void netframe_pthread_stop()
     for(i = 0; i  < g_params.tConfigHandle.lNumberOfThread; i++)
     {
         hmi_plat_StopThread(g_params.tConfigHandle.szConfigHandleItem[i].ThreadHandle, 50);
-    }
-
-    for(i = 0; i < g_params.tConfigAuxiliary.lNumberOfThread; i++)
-    {
-        hmi_plat_StopThread(g_params.tConfigAuxiliary.szConfigAuxiliaryItem[i].ThreadHandle, 50);
     }
 
     for(i = 0; i  < g_params.tConfigIO.lNumberOfThread; i++)
@@ -94,23 +83,20 @@ static void sig_donothing(int signo)
     //printf("do nothing");
 }
 
-void  netframe_uninit(ACCEPT_THREAD_CONTEXT *pAcceptContexts, IO_THREAD_CONTEXT *pIoThreadContexts, HANDLE_THREAD_CONTEXT *pHandleContexts, AUXILIARY_THREAD_CONTEXT *pAuxiliaryContexts)
+void  netframe_uninit(ACCEPT_THREAD_CONTEXT *pAcceptContexts, IO_THREAD_CONTEXT *pIoThreadContexts, HANDLE_THREAD_CONTEXT *pHandleContexts)
 {
     accept_thread_uninit(pAcceptContexts);
     io_thread_uninit(pIoThreadContexts);
     handle_thread_uninit(pHandleContexts);
-    auxiliary_thread_uninit(pAuxiliaryContexts);
 }
 
 int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nMaxPacketSize)
 {
     int nRet = CNV_ERR_OK;
     bzero(&g_params, sizeof(g_params));
-    ACCEPT_THREAD_CONTEXT tAcceptContext;
-    bzero(&tAcceptContext, sizeof(tAcceptContext));
+    bzero(&g_tAcceptContext, sizeof(g_tAcceptContext));
     bzero(g_szIoThreadContexts, sizeof(g_szIoThreadContexts));
     bzero(g_szHandleContexts, sizeof(g_szHandleContexts));
-    bzero(g_szAuxiliaryContext, sizeof(g_szAuxiliaryContext));
 
     if(signal(SIGCHLD, sig_donothing) == SIG_ERR)
     {
@@ -170,17 +156,8 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
     }
     LOG_SYS_DEBUG("io_thread_start ok.");
 
-    //开启AUXILIARY线程
-    nRet = auxiliary_thread_start(g_szAuxiliaryContext);
-    if(nRet != CNV_ERR_OK)
-    {
-        LOG_SYS_FATAL("auxiliary_thread_start error : %d ", nRet);
-        return  nRet;
-    }
-    LOG_SYS_DEBUG("auxiliary_thread_start ok.");
-
     //开启accept线程
-    nRet = accept_thread_start(g_szIoThreadContexts, &tAcceptContext);
+    nRet = accept_thread_start(g_szIoThreadContexts, &g_tAcceptContext);
     if(nRet != CNV_ERR_OK)
     {
         LOG_SYS_FATAL("cnv_agent_start_accept_thread error : %d ", nRet);
@@ -190,7 +167,7 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
 
     netframe_pthread_join();   //线程挂起
     netframe_pthread_stop(); //终止线程
-    netframe_uninit(&tAcceptContext, g_szIoThreadContexts, g_szHandleContexts, g_szAuxiliaryContext);  //反初始化
+    netframe_uninit(&g_tAcceptContext, g_szIoThreadContexts, g_szHandleContexts);  //反初始化
 
     return  CNV_ERR_OK;
 }

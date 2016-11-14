@@ -33,7 +33,7 @@
 #include <arpa/inet.h>
 
 int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle_io_msgque, void *HashAddrFd, void *HashConnidFd, IO_THREAD_CONTEXT *pIoThreadContext);
-extern AUXILIARY_THREAD_CONTEXT g_szAuxiliaryContext[MAX_AUXILIARY_THREAD];
+extern ACCEPT_THREAD_CONTEXT g_tAcceptContext;
 
 void free_acceptio_fifo(cnv_fifo *accept_io_msgque)
 {
@@ -116,15 +116,22 @@ void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
         pIoThreadContext->tMonitorElement.nSvrConnNum = cnv_hashmap_size(pIoThreadContext->HashAddrFd);
         pIoThreadContext->tMonitorElement.nIoMsgQueCount = get_block_queue_count(pIoThreadContext->handle_io_msgque);
 
-        AUXILIARY_QUEQUE_DATA *ptAuxiQueData = NULL;
-        pIoThreadContext->pfncnv_monitor_callback(&pIoThreadContext->tMonitorElement, &ptAuxiQueData);
+        STATISTICS_QUEQUE_DATA *ptStatisQueData = NULL;
+        pIoThreadContext->pfncnv_monitor_callback(&pIoThreadContext->tMonitorElement, &ptStatisQueData);
 
-        int nRet = lockfree_queue_enqueue(&(g_szAuxiliaryContext[0].poll_msgque), ptAuxiQueData, 1);   //队列满了把数据丢掉,以免内存泄露
+        int nRet = lockfree_queue_enqueue(&(g_tAcceptContext.statis_msgque), ptStatisQueData, 1);   //队列满了把数据丢掉,以免内存泄露
         if(nRet == false)
         {
             LOG_SYS_ERROR("auxiliary queue is full!");
-            cnv_comm_Free(ptAuxiQueData->pData);
-            cnv_comm_Free(ptAuxiQueData);
+            cnv_comm_Free(ptStatisQueData->pData);
+            cnv_comm_Free(ptStatisQueData);
+        }
+
+        uint64_t ulWakeup = 1;   //任意值,无实际意义
+        nRet = write(g_tAcceptContext.accept_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒handle
+        if(nRet != sizeof(ulWakeup))
+        {
+            LOG_SYS_FATAL("io wake up accept failed !");
         }
     }
 
@@ -1247,13 +1254,11 @@ int netframe_init_io(IO_THREAD_ITEM   *pTheadparam)
 // 线程运行
 int  io_thread_run(void *pThreadParameter)
 {
-    int nCount = -1;
     uint64_t ulData = 0;
     struct epoll_event szEpollEvent[DEFAULF_EPOLL_SIZE];
     bzero(szEpollEvent, sizeof(szEpollEvent));
     IO_THREAD_ITEM *pTheadparam = (IO_THREAD_ITEM *)pThreadParameter;
     IO_THREAD_CONTEXT *pIoThreadContext = pTheadparam->pIoThreadContext;
-    pIoThreadContext->EpollEvent = szEpollEvent;
     int Epollfd = pIoThreadContext->Epollfd;
     int EventfdAccept = pIoThreadContext->accept_io_eventfd;  //ACCEPT唤醒
     int EventfdHandle = pIoThreadContext->handle_io_eventfd;   //HANDLE唤醒
@@ -1274,7 +1279,7 @@ int  io_thread_run(void *pThreadParameter)
 
     while(1)
     {
-        nCount = epoll_wait(Epollfd, szEpollEvent, DEFAULF_EPOLL_SIZE, -1);
+        int nCount = epoll_wait(Epollfd, szEpollEvent, DEFAULF_EPOLL_SIZE, -1);
         if(nCount > 0)
         {
             for(int i = 0; i < nCount; i++)
@@ -1344,6 +1349,8 @@ int  io_thread_run(void *pThreadParameter)
                     remove_client_socket_hashmap(Epollfd, HashConnidFd, szEpollEvent[i].data.ptr);
                 }
             }
+
+            bzero(szEpollEvent, sizeof(struct epoll_event)*nCount);
         }
         else if(nCount < 0)   //错误
         {
