@@ -178,7 +178,7 @@ int netframe_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int nTime
     else
     {
         int nErrno = errno;
-        LOG_SYS_ERROR("%s, ip:%s, port:%", strerror(nErrno), pAddrIP, ulPort);
+        LOG_SYS_ERROR("%s, ip:%s, port:%d.", strerror(nErrno), pAddrIP, ulPort);
         if(nErrno != EINPROGRESS)
         {
             return -1;

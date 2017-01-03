@@ -473,7 +473,7 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
         nRet = netframe_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->lPort, nTimeOut); //创建连接
         nTimeOut *= 2;
     }
-    while(nRet != CNV_ERR_OK && nReconTimes++ < 3);
+    while(nRet != CNV_ERR_OK && nReconTimes++ < 5);
 
     if(nRet != CNV_ERR_OK)
     {
