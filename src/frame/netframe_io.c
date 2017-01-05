@@ -79,7 +79,6 @@ void free_server_unblock_queue(CNV_UNBLOCKING_QUEUE *queServer)
 
 void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
 {
-    LOG_ACC_DEBUG("io %d, RecvLengthPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvLength / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, RcvPackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lRecvPackNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, ParsePackNumPerSecond=%ld", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.lParsePackNum / g_params.tMonitor.interval_sec);
     LOG_ACC_DEBUG("io %d, RepTimesPerSecond=%d", pIoThreadContext->threadindex, pIoThreadContext->tMonitorElement.nRespondTimes / g_params.tMonitor.interval_sec);
@@ -984,7 +983,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
     CLIENT_SOCKET_DATA *ptClnSockData = &(pSocketElement->uSockElement.tClnSockElement.SocketData);
     pmsg->msg_iov->iov_base = ptClnSockData->pDataBuffer + ptClnSockData->lDataRemain;       //拼接剩余数据
     pmsg->msg_iov->iov_len = g_params.nMaxBufferSize - ptClnSockData->lDataRemain;    //剩余缓存长度
-    bzero(pmsg->msg_iov->iov_base, pmsg->msg_iov->iov_len);
+    memset(pmsg->msg_iov->iov_base, 0, pmsg->msg_iov->iov_len);
 
     nRet = netframe_recvmsg(pSocketElement->Socket, pmsg, &nDataReadLen);  //接收数据
     if(nRet != CNV_ERR_OK)
@@ -1006,13 +1005,12 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         return nRet;
     }
 
-    //udp
+    //udp 获取对端ip
     //struct sockaddr_in *ptClientAddr = (struct sockaddr_in *)(pmsg->msg_name);
     //LOG_SYS_DEBUG("peer ip:%s", inet_ntoa(ptClientAddr->sin_addr));
     //char strClientIp[32] = { 0 };
     //memcpy(strClientIp, inet_ntoa(ptClientAddr->sin_addr), sizeof(strClientIp) - 1);
 
-    pIoThreadContext->tMonitorElement.lRecvLength += nDataReadLen;
     pIoThreadContext->tMonitorElement.lRecvPackNum++;
     pSocketElement->Time = cnv_comm_get_utctime();  //收、发数据后重置时间戳
     LOG_SYS_DEBUG("lDataRemain:%d, read data length:%d", ptClnSockData->lDataRemain, nDataReadLen);
@@ -1038,6 +1036,12 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
             if(nRet == CNV_PARSE_FINISH && ptClnSockData->lDataRemain > 0)  //结束解析而且有剩余数据
             {
                 memcpy(ptClnSockData->pDataBuffer, ptClnSockData->pMovePointer, ptClnSockData->lDataRemain);
+                if(ptClnSockData->lDataRemain >= g_params.nMaxBufferSize)   //单个包长度超过缓冲区大小,直接丢弃
+                {
+                    LOG_SYS_ERROR("single package beyond max buffer.");
+                    memset(ptClnSockData->pDataBuffer, 0, g_params.nMaxBufferSize);
+                    ptClnSockData->lDataRemain = 0;
+                }
             }
             else if(nRet == CNV_PARSE_SHUTDOWN)    //关闭客户端
             {
