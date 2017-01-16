@@ -83,7 +83,7 @@ extern "C"
         0    成功
         其它 失败
         =========================================================*/
-    typedef int (*pfnCNV_PARSE_PROTOCOL)(char **ppDataBuff, unsigned int *pnDataSize, char **ppPacket, unsigned int  *pnPacketSize, void **ppAuxiliary);
+    typedef int (*pfnCNV_PARSE_PROTOCOL)(char **ppDataBuff, unsigned int *pnDataSize, char **ppPacket, unsigned int  *pnPacketSize);
 
     /*=======================================================
     功能:

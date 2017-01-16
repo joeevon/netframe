@@ -57,23 +57,15 @@ void  free_iohandle_lockfreequeue(LOCKFREE_QUEUE  *io_handle_msgque)
 }
 
 //处理io消息
-void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleContext)
+void handlethread_handle_iomsg(int  EventfdIo, void *pBusinessParams, HANDLE_THREAD_CONTEXT *pHandleContext)
 {
     IO_TO_HANDLE_DATA *pIOHanldeData = (IO_TO_HANDLE_DATA *)lockfree_queue_dequeue(&pHandleContext->io_handle_msgque, 1);
-    if(!pIOHanldeData)
+    if(pIOHanldeData == NULL)
     {
         return;
     }
 
-    HANDLE_PARAMS *ptHandleParams = (pHandleContext->pHandleParam ? (HANDLE_PARAMS *)pHandleContext->pHandleParam : NULL);
-    if(ptHandleParams && ptHandleParams->pBusinessParams)
-    {
-        pIOHanldeData->pfncnv_handle_business(pIOHanldeData, &pHandleContext->queuerespond, ptHandleParams->pBusinessParams);  //执行回调函数
-    }
-    else
-    {
-        pIOHanldeData->pfncnv_handle_business(pIOHanldeData, &pHandleContext->queuerespond, NULL);  //执行回调函数
-    }
+    pIOHanldeData->pfncnv_handle_business(pIOHanldeData, &pHandleContext->queuerespond, pBusinessParams);  //执行回调函数
 
     int nRet = CNV_ERR_OK;
     uint64_t ulWakeup = 1;  //任意值,无实际意义
@@ -81,33 +73,15 @@ void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleCon
     int nNumOfPostMsg = get_unblock_queue_count(&pHandleContext->queuerespond);
     LOG_SYS_DEBUG("nNumOfPostMsg = %d", nNumOfPostMsg);
 
-    CNV_BLOCKING_QUEUE *handle_io_msgque = NULL;
-    int handle_io_eventfd = 0;
-    if(get_unblock_queue_count(pHandleContext->queDistribute) > 0)
-    {
-        char *pThreadIndex = (char *)poll_unblock_queue_head(pHandleContext->queDistribute);
-        push_unblock_queue_tail(pHandleContext->queDistribute, pThreadIndex);    //此处取出后重新插入,达到分配效果
-        int lThreadIndex = atoi(pThreadIndex);
-        LOG_SYS_DEBUG("handle thread %d select io thread %d", pHandleContext->lthreadindex, lThreadIndex);
-        handle_io_msgque = g_szIoThreadContexts[lThreadIndex - 1].handle_io_msgque;
-        handle_io_eventfd = g_szIoThreadContexts[lThreadIndex - 1].handle_io_eventfd;
-    }
-    else
-    {
-        handle_io_msgque = pIOHanldeData->handle_io_msgque;
-        handle_io_eventfd = pIOHanldeData->handle_io_eventfd;
-    }
-
     while(nNumOfPostMsg--)    // handle线程单独用的队列,无需加锁
     {
         void *pPostData = poll_unblock_queue_head(&pHandleContext->queuerespond);
-        nRet = push_block_queue_tail(handle_io_msgque, pPostData, 1);  //队列满了把数据丢掉,以免内存泄露
+        nRet = push_block_queue_tail(pIOHanldeData->handle_io_msgque, pPostData, 1);  //队列满了把数据丢掉,以免内存泄露
         if(nRet == false)
         {
             LOG_SYS_ERROR("handle_io queue is full!");
-            HANDLE_TO_IO_DATA *pHandleIOData = (HANDLE_TO_IO_DATA *)pPostData;
-            cnv_comm_Free(pHandleIOData->pDataSend);
-            cnv_comm_Free(pHandleIOData);
+            free(((HANDLE_TO_IO_DATA *)pPostData)->pDataSend);
+            free(pPostData);
             continue;
         }
         bIsWakeIO = true;
@@ -115,7 +89,7 @@ void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleCon
 
     if(bIsWakeIO)
     {
-        nRet = write(handle_io_eventfd, &ulWakeup, sizeof(ulWakeup));  //handle唤醒io
+        nRet = write(pIOHanldeData->handle_io_eventfd, &ulWakeup, sizeof(ulWakeup));  //handle唤醒io
         if(nRet != sizeof(ulWakeup))
         {
             LOG_SYS_ERROR("handle wake io failed.");
@@ -123,8 +97,8 @@ void handlethread_handle_iomsg(int  EventfdIo, HANDLE_THREAD_CONTEXT *pHandleCon
         bIsWakeIO = K_FALSE;
     }
 
-    cnv_comm_Free(pIOHanldeData->pDataSend);
-    cnv_comm_Free(pIOHanldeData);
+    free(pIOHanldeData->pDataSend);
+    free(pIOHanldeData);
 
     if(lockfree_queue_len(&pHandleContext->io_handle_msgque) <= 0)
     {
@@ -239,12 +213,18 @@ int  handle_thread_run(void *pThreadParameter)
     int i = 0;
     uint64_t ulData = 0;
     struct epoll_event szEpollEvent[DEFAULF_EPOLL_SIZE];
-    bzero(szEpollEvent, sizeof(szEpollEvent));
+    memset(szEpollEvent, 0, sizeof(szEpollEvent));
     HANDLE_THREAD_ITEM *pTheadparam = (HANDLE_THREAD_ITEM *)pThreadParameter;
     HANDLE_THREAD_CONTEXT *pHandleContext = pTheadparam->pHandleContext;
     HANDLE_PARAMS *pHandleParams = (HANDLE_PARAMS *)pHandleContext->pHandleParam;
     int Epollfd = pHandleContext->Epollfd;
-    int  EventfdIo = pHandleContext->io_handle_eventfd;    //io唤醒
+    int EventfdIo = pHandleContext->io_handle_eventfd;    //io唤醒
+    void *pBusinessParams = NULL;
+    HANDLE_PARAMS *ptHandleParams = (pHandleContext->pHandleParam ? (HANDLE_PARAMS *)pHandleContext->pHandleParam : NULL);
+    if(ptHandleParams && ptHandleParams->pBusinessParams)
+    {
+        pBusinessParams = ptHandleParams->pBusinessParams;
+    }
 
     int nRet = netframe_init_handle(pTheadparam);
     if(nRet != CNV_ERR_OK)
@@ -260,11 +240,11 @@ int  handle_thread_run(void *pThreadParameter)
         {
             for(i = 0; i < nCount; i++)
             {
-                if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))      //读事件
+                if(szEpollEvent[i].events & (EPOLLIN | EPOLLPRI))    //读事件
                 {
                     if(szEpollEvent[i].data.fd == EventfdIo)     //io唤醒
                     {
-                        handlethread_handle_iomsg(EventfdIo, pHandleContext);
+                        handlethread_handle_iomsg(EventfdIo, pBusinessParams, pHandleContext);
                     }
                     else   //定时事件
                     {
@@ -280,7 +260,7 @@ int  handle_thread_run(void *pThreadParameter)
                             int nRet = lockfree_queue_enqueue(&(g_tAcceptContext.statis_msgque), ptStatisQueData, 1);   //队列满了把数据丢掉,以免内存泄露
                             if(nRet == false)
                             {
-                                LOG_SYS_ERROR("auxiliary queue is full!");
+                                LOG_SYS_ERROR("statistics queue is full!");
                                 cnv_comm_Free(ptStatisQueData->pData);
                                 cnv_comm_Free(ptStatisQueData);
                             }
@@ -312,7 +292,7 @@ int  handle_thread_run(void *pThreadParameter)
                 }
             }
 
-            bzero(szEpollEvent, sizeof(struct epoll_event)*nCount);
+            memset(szEpollEvent, 0, sizeof(struct epoll_event)*nCount);
         }
         else if(nCount < 0)
         {

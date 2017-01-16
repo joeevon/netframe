@@ -26,7 +26,7 @@ extern "C"
     参数:
     返回值:
     =========================================================*/
-    extern int admin_parse_data(char **ppDataBuff, unsigned int *pnDataSize, char **ppPacket, unsigned int *pnPacketSize, void **ppAuxiliary);
+    extern int admin_parse_data(char **ppDataBuff, unsigned int *pnDataSize, char **ppPacket, unsigned int *pnPacketSize);
 
     /*=======================================================
     功能:
