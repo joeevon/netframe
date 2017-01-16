@@ -396,7 +396,7 @@ int netframe_init_config()
     g_params.tConfigIO.lHandleIoMsgSize = atoi(nodeValue);
     //====================HANDLEIOMSGSIZE==============================
 
-    //=====================IOHANDLEMSGSIZE============================
+    //=======================IOHANDLEMSGSIZE============================
     bzero(nodeValue, sizeof(nodeValue));
     bzero(errMsg, sizeof(errMsg));
 
@@ -408,7 +408,21 @@ int netframe_init_config()
         return nRet;
     }
     g_params.tConfigHandle.lIoHandleMsgSize = atoi(nodeValue);
-    //====================IOHANDLEMSGSIZE==============================
+    //======================IOHANDLEMSGSIZE==============================
+
+    //=======================DAEMON============================
+    bzero(nodeValue, sizeof(nodeValue));
+    bzero(errMsg, sizeof(errMsg));
+
+    nRet = cnv_comm_xml_GetValue_ByPath(pDoc, "/root/daemon", nodeValue, sizeof(nodeValue), errMsg, sizeof(errMsg));
+    if(nRet != 0)
+    {
+        LOG_SYS_FATAL("read config node /root/daemon value failed :%s,errcode:%d", errMsg, nRet);
+        xmlFreeDoc(pDoc);
+        return nRet;
+    }
+    g_params.nDaemon = atoi(nodeValue);
+    //======================DAEMON==============================
 
     xmlFreeDoc(pDoc);
     return CNV_ERR_OK;

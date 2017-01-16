@@ -282,7 +282,8 @@ extern "C"
         TIMER_STRUCT  tHeartBeat;
         TIMER_STRUCT  tSocketClear;
         TIMER_STRUCT  tMonitor;
-        int nMaxBufferSize;
+		int nMaxBufferSize;  //客户端最大缓存
+		int nDaemon;  //是否后台运行
     } GLOBAL_PARAMS;
 
 #ifdef __cplusplus

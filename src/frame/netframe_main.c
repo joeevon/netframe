@@ -19,6 +19,7 @@
 #include "cnv_thread.h"
 #include "cnv_comm.h"
 #include <signal.h>
+#include <unistd.h>
 
 GLOBAL_PARAMS  g_params;      //全局配置参数
 ACCEPT_THREAD_CONTEXT g_tAcceptContext;
@@ -155,6 +156,11 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
         return  nRet;
     }
     LOG_SYS_DEBUG("io_thread_start ok.");
+
+    if(g_params.nDaemon > 0)     //后台运行
+    {
+        daemon(0, 0);
+    }
 
     //开启accept线程
     nRet = accept_thread_start(g_szIoThreadContexts, &g_tAcceptContext);
