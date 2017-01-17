@@ -58,16 +58,19 @@
      <io_thread>
         <thread>
             <name>T1</name>
+			<isstatistics>1</isstatistics>
             <distribution>H1,H2,H3</distribution>
             <algorithm>1:1:1</algorithm>
         </thread>
         <thread>
             <name>T2</name>
+			<isstatistics>1</isstatistics>
             <distribution>H1,H2,H3</distribution>
             <algorithm>1:1:1</algorithm>
         </thread>
         <thread>
             <name>T3</name>
+			<isstatistics>1</isstatistics>
             <distribution>H1,H2,H3</distribution>
             <algorithm>1:1:1</algorithm>
         </thread>
@@ -75,18 +78,15 @@
     <handle_thread>
         <handle>
             <name>H1</name>
-            <distribution>T1,T2,T3</distribution>
-            <algorithm>1:1:1</algorithm>
+			<isstatistics>1</isstatistics>
         </handle> 
         <handle>
             <name>H2</name>
-            <distribution>T1,T2,T3</distribution>
-            <algorithm>1:1:1</algorithm>
+			<isstatistics>1</isstatistics>
         </handle> 
         <handle>
             <name>H3</name>
-            <distribution>T1,T2,T3</distribution>
-            <algorithm>1:1:1</algorithm>
+			<isstatistics>1</isstatistics>
         </handle> 
     </handle_thread>
 	<clearsocket>

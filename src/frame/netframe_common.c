@@ -192,9 +192,9 @@ int netframe_init_config()
                         {
                             snprintf(g_params.tConfigIO.szConfigIOItem[lIndex].strThreadName, sizeof(g_params.tConfigIO.szConfigIOItem[lIndex].strThreadName) - 1, "%s", pItemVaule);
                         }
-                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"distributetype"))
+                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"isstatistics"))
                         {
-                            g_params.tConfigIO.szConfigIOItem[lIndex].nDistributeType = atoi(pItemVaule);
+                            g_params.tConfigIO.szConfigIOItem[lIndex].nIsStasistics = atoi(pItemVaule);
                         }
                         else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"distribution"))
                         {
@@ -243,13 +243,9 @@ int netframe_init_config()
                         {
                             snprintf(g_params.tConfigHandle.szConfigHandleItem[lIndex].strThreadName, sizeof(g_params.tConfigHandle.szConfigHandleItem[lIndex].strThreadName) - 1, "%s", pItemVaule);
                         }
-                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"distribution"))
+                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"isstatistics"))
                         {
-                            snprintf(g_params.tConfigHandle.szConfigHandleItem[lIndex].strDistribution, sizeof(g_params.tConfigHandle.szConfigHandleItem[lIndex].strDistribution) - 1, "%s", pItemVaule);
-                        }
-                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"algorithm"))
-                        {
-                            snprintf(g_params.tConfigHandle.szConfigHandleItem[lIndex].strAlgorithm, sizeof(g_params.tConfigHandle.szConfigHandleItem[lIndex].strAlgorithm) - 1, "%s", pItemVaule);
+                            g_params.tConfigHandle.szConfigHandleItem[lIndex].nIsStasistics = atoi(pItemVaule);
                         }
 
                         xmlFree(pItemVaule);

@@ -99,7 +99,7 @@ extern "C"
         queuerespond里的数据有业务申请内存，框架释放
     参数:
     =========================================================*/
-    typedef void(*pfnCNV_STATISTICS_CALLBACK)(const struct __STATISTICS_QUEQUE_DATA *ptStatisQueData, CNV_UNBLOCKING_QUEUE *queuerespond);
+    typedef void(*pfnCNV_STATISTICS_CALLBACK)(const struct __STATISTICS_QUEQUE_DATA *ptStatisQueData, uint32_t nStatisThreadNum, CNV_UNBLOCKING_QUEUE *queuerespond);
 
     /*=======================================================
     功能:
