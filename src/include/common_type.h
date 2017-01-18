@@ -167,7 +167,8 @@ extern "C"
     {
         K_BOOL isReqLogin;   //是否发送登录请求
         K_BOOL isRecvSvrData;  //服务端向客户端推送数据
-        time_t nStartConnect;   //开始连接时间
+        int nMaxReconTimes;  //最大重连次数  0 ~ 7
+        int nTimeOut;  //连接超时时长,microsecond  0 ~ 70000
         int  lPort;   //端口
         int  lHeartBeatLen;   //心跳包长度
         char *pHeartBeat;    //心跳包数据

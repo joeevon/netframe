@@ -461,15 +461,34 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
 {
     int nSocket = 0;
     int nRet = -1;
-    int nTimeOut = 50000;  //microsecond
+
+    int nTimeOut = 0;  //microsecond
+    if(pSvrSockData->nTimeOut > 0 || pSvrSockData->nTimeOut <= 70000)
+    {
+        nTimeOut = pSvrSockData->nTimeOut;
+    }
+    else
+    {
+        nTimeOut = 70000;
+    }
+
     int nReconTimes = 1;  //重连次数
+    int nMaxReconTimes = 0;  //最大重连次数
+    if(pSvrSockData->nMaxReconTimes > 0 || pSvrSockData->nMaxReconTimes <= 7)
+    {
+        nMaxReconTimes = pSvrSockData->nMaxReconTimes;
+    }
+    else
+    {
+        nMaxReconTimes = 7;
+    }
 
     do
     {
         nRet = netframe_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->lPort, nTimeOut); //创建连接
         nTimeOut *= 2;
     }
-    while(nRet != CNV_ERR_OK && nReconTimes++ < 5);
+    while(nRet != CNV_ERR_OK && nReconTimes++ < nMaxReconTimes);
 
     if(nRet != CNV_ERR_OK)
     {
