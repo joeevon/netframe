@@ -107,7 +107,6 @@
 			<intervalsec>60</intervalsec>
 			<intervalnsec>0</intervalnsec>
 	</monitor>
-	<daemon>1</daemon>
 	<handleiomsgsize>10000</handleiomsgsize>
 	<iohandlemsgsize>10000</iohandlemsgsize>
 </root>
