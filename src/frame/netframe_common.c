@@ -463,7 +463,7 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
     int nRet = -1;
 
     int nTimeOut = 0;  //microsecond
-    if(pSvrSockData->nTimeOut > 0 || pSvrSockData->nTimeOut <= 70000)
+    if(pSvrSockData->nTimeOut > 0 && pSvrSockData->nTimeOut <= 70000)
     {
         nTimeOut = pSvrSockData->nTimeOut;
     }
@@ -474,7 +474,7 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
 
     int nReconTimes = 1;  //重连次数
     int nMaxReconTimes = 0;  //最大重连次数
-    if(pSvrSockData->nMaxReconTimes > 0 || pSvrSockData->nMaxReconTimes <= 7)
+    if(pSvrSockData->nMaxReconTimes > 0 && pSvrSockData->nMaxReconTimes <= 7)
     {
         nMaxReconTimes = pSvrSockData->nMaxReconTimes;
     }
