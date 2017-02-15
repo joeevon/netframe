@@ -886,7 +886,7 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
 
         if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)    //接收数据缓存
         {
-            pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer = malloc(g_params.nMaxBufferSize);
+            pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer = (char *)malloc(g_params.nMaxBufferSize);
             if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)
             {
                 return  CNV_ERR_MALLOC;

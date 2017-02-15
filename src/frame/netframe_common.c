@@ -757,12 +757,24 @@ int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CON
     pSocketElement->uSockElement.tClnSockElement.msg.msg_namelen = sizeof(struct sockaddr_in);
     pSocketElement->uSockElement.tClnSockElement.msg.msg_iov = &(pSocketElement->uSockElement.tClnSockElement.tIovecClnData);
     pSocketElement->uSockElement.tClnSockElement.msg.msg_iovlen = 1;
+    pSocketElement->uSockElement.tClnSockElement.msg.msg_control = pSocketElement->uSockElement.tClnSockElement.strControl;
+    pSocketElement->uSockElement.tClnSockElement.msg.msg_controllen = sizeof(pSocketElement->uSockElement.tClnSockElement.strControl);
+    snprintf(pSvrSockData->tCallback.strProtocol, sizeof(pSvrSockData->tCallback.strProtocol) - 1, "parse_server");
     set_callback_function(SERVER_CALLBACK_FUNC, &(pSvrSockData->tCallback));
     snprintf(pSocketElement->uSockElement.tClnSockElement.strServiceName, sizeof(pSocketElement->uSockElement.tClnSockElement.strServiceName) - 1, "%s", pSvrSockData->strServiceName);
     snprintf(pSocketElement->uSockElement.tClnSockElement.tSvrSockData.strServerIp, sizeof(pSocketElement->uSockElement.tClnSockElement.tSvrSockData.strServerIp) - 1, "%s", pSvrSockData->strServerIp);
     pSocketElement->uSockElement.tClnSockElement.tSvrSockData.lPort = pSvrSockData->lPort;
     pSocketElement->uSockElement.tClnSockElement.pfncnv_parse_protocol = pSvrSockData->tCallback.pfncnv_parse_protocol;
     pSocketElement->uSockElement.tClnSockElement.pfncnv_handle_business = pSvrSockData->tCallback.pfncnv_handle_business;
+
+    if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)     //接收数据缓存
+    {
+        pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer = (char *)malloc(g_params.nMaxBufferSize);
+        if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)
+        {
+            return  CNV_ERR_MALLOC;
+        }
+    }
 
     int ConnId = netframe_get_hashkey(pIoThreadContext->HashConnidFd, &(pIoThreadContext->SeedOfKey));
     char *pKey = (char *)cnv_comm_Malloc(64);
