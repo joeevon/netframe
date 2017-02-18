@@ -6,3 +6,4 @@
 /src/*.filters
 /src/*.user
 /src/Debug
+/src/*.opendb
