@@ -99,7 +99,7 @@ extern "C"
         queuerespond里的数据有业务申请内存，框架释放
     参数:
     =========================================================*/
-    typedef void(*pfnCNV_STATISTICS_CALLBACK)(const struct __STATISTICS_QUEQUE_DATA *ptStatisQueData, CNV_UNBLOCKING_QUEUE *queuerespond);
+    typedef void(*pfnCNV_STATISTICS_CALLBACK)(const struct __STATISTICS_QUEQUE_DATA *ptStatisQueData, uint32_t nStatisThreadNum, CNV_UNBLOCKING_QUEUE *queuerespond);
 
     /*=======================================================
     功能:
@@ -167,7 +167,8 @@ extern "C"
     {
         K_BOOL isReqLogin;   //是否发送登录请求
         K_BOOL isRecvSvrData;  //服务端向客户端推送数据
-        time_t nStartConnect;   //开始连接时间
+        int nMaxReconTimes;  //最大重连次数  0 ~ 7
+        int nTimeOut;  //连接超时时长,microsecond  0 ~ 70000
         int  lPort;   //端口
         int  lHeartBeatLen;   //心跳包长度
         char *pHeartBeat;    //心跳包数据

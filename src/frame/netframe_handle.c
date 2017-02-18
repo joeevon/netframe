@@ -112,11 +112,6 @@ int netframe_init_handle(HANDLE_THREAD_ITEM *pTheadparam)
     int nRet = CNV_ERR_OK;
     HANDLE_THREAD_CONTEXT *pHandleContext = pTheadparam->pHandleContext;
 
-    //负载解析
-    cnv_parse_distribution(pTheadparam->strAlgorithm, pTheadparam->strDistribution, pHandleContext->queDistribute);
-    LOG_SYS_DEBUG("handle thread : %s, distribution: %s", pTheadparam->strThreadName, pTheadparam->strDistribution);
-    iterator_unblock_queuqe(pHandleContext->queDistribute, printDistribution, (void *)0);
-
     //监听io写handle
     nRet = netframe_setblockopt(pHandleContext->io_handle_eventfd, K_FALSE);
     if(nRet != CNV_ERR_OK)

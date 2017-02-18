@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdint.h>
 #include <arpa/inet.h>
 #include <sys/eventfd.h>
 
@@ -42,7 +43,7 @@ void  free_accept_lockfreequeue(LOCKFREE_QUEUE  *statis_msgque)
     }
 }
 
-void statistics_data(int nAcceptFd, ACCEPT_THREAD_CONTEXT *pAcceptContext)
+void statistics_data(int nAcceptFd, uint32_t nStatisThreadNum, ACCEPT_THREAD_CONTEXT *pAcceptContext)
 {
     int nRet = 0;
 
@@ -54,7 +55,7 @@ void statistics_data(int nAcceptFd, ACCEPT_THREAD_CONTEXT *pAcceptContext)
 
     if(pAcceptContext->tStatisCallback.pfncnv_statistics_callback != NULL)
     {
-        pAcceptContext->tStatisCallback.pfncnv_statistics_callback(ptStatisQueData, &(pAcceptContext->queStatisData));
+        pAcceptContext->tStatisCallback.pfncnv_statistics_callback(ptStatisQueData, nStatisThreadNum, &(pAcceptContext->queStatisData));
     }
 
     uint64_t ulWakeup = 1;  //任意值,无实际意义
@@ -86,9 +87,8 @@ void statistics_data(int nAcceptFd, ACCEPT_THREAD_CONTEXT *pAcceptContext)
         bIsWakeIO = K_FALSE;
     }
 
-    cnv_comm_Free(ptStatisQueData->pData);
-    cnv_comm_Free(ptStatisQueData);
-
+    free(ptStatisQueData->pData);
+    free(ptStatisQueData);
 
     if(lockfree_queue_len(&pAcceptContext->statis_msgque) <= 0)
     {
@@ -462,6 +462,23 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
     CNV_UNBLOCKING_QUEUE *queEventfds = pAcceptContext->queEventfds;  //需要唤醒的队列
     int Epollfd = pAcceptContext->Epollfd;
     int AcceptFd = pAcceptContext->accept_eventfd;
+    uint32_t nStatisThreadNum = 0;
+
+    for(int32_t nIndex = 0; nIndex < g_params.tConfigIO.lNumberOfThread; nIndex++)
+    {
+        if(g_params.tConfigIO.szConfigIOItem[nIndex].nIsStasistics > 0)
+        {
+            nStatisThreadNum++;
+        }
+    }
+
+    for(int32_t nIndex = 0; nIndex < g_params.tConfigHandle.lNumberOfThread; nIndex++)
+    {
+        if(g_params.tConfigHandle.szConfigHandleItem[nIndex].nIsStasistics > 0)
+        {
+            nStatisThreadNum++;
+        }
+    }
 
     int nRet = netframe_init_accept(pAcceptContext, pThreadparam, pAcceptContext->HashFdListen);
     if(nRet != CNV_ERR_OK)
@@ -485,7 +502,7 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
                 {
                     if(szEpollEvent[i].data.fd == AcceptFd)  //统计数据
                     {
-                        statistics_data(szEpollEvent[i].data.fd, pAcceptContext);
+                        statistics_data(szEpollEvent[i].data.fd, nStatisThreadNum, pAcceptContext);
                     }
                     else    //客户端连接
                     {

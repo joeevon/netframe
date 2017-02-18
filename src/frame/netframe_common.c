@@ -192,9 +192,9 @@ int netframe_init_config()
                         {
                             snprintf(g_params.tConfigIO.szConfigIOItem[lIndex].strThreadName, sizeof(g_params.tConfigIO.szConfigIOItem[lIndex].strThreadName) - 1, "%s", pItemVaule);
                         }
-                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"distributetype"))
+                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"isstatistics"))
                         {
-                            g_params.tConfigIO.szConfigIOItem[lIndex].nDistributeType = atoi(pItemVaule);
+                            g_params.tConfigIO.szConfigIOItem[lIndex].nIsStasistics = atoi(pItemVaule);
                         }
                         else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"distribution"))
                         {
@@ -243,13 +243,9 @@ int netframe_init_config()
                         {
                             snprintf(g_params.tConfigHandle.szConfigHandleItem[lIndex].strThreadName, sizeof(g_params.tConfigHandle.szConfigHandleItem[lIndex].strThreadName) - 1, "%s", pItemVaule);
                         }
-                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"distribution"))
+                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"isstatistics"))
                         {
-                            snprintf(g_params.tConfigHandle.szConfigHandleItem[lIndex].strDistribution, sizeof(g_params.tConfigHandle.szConfigHandleItem[lIndex].strDistribution) - 1, "%s", pItemVaule);
-                        }
-                        else if(!xmlStrcmp(ptNodeItem->name, (const xmlChar *)"algorithm"))
-                        {
-                            snprintf(g_params.tConfigHandle.szConfigHandleItem[lIndex].strAlgorithm, sizeof(g_params.tConfigHandle.szConfigHandleItem[lIndex].strAlgorithm) - 1, "%s", pItemVaule);
+                            g_params.tConfigHandle.szConfigHandleItem[lIndex].nIsStasistics = atoi(pItemVaule);
                         }
 
                         xmlFree(pItemVaule);
@@ -465,15 +461,34 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
 {
     int nSocket = 0;
     int nRet = -1;
-    int nTimeOut = 50000;  //microsecond
+
+    int nTimeOut = 0;  //microsecond
+    if(pSvrSockData->nTimeOut > 0 && pSvrSockData->nTimeOut <= 70000)
+    {
+        nTimeOut = pSvrSockData->nTimeOut;
+    }
+    else
+    {
+        nTimeOut = 70000;
+    }
+
     int nReconTimes = 1;  //重连次数
+    int nMaxReconTimes = 0;  //最大重连次数
+    if(pSvrSockData->nMaxReconTimes > 0 && pSvrSockData->nMaxReconTimes <= 7)
+    {
+        nMaxReconTimes = pSvrSockData->nMaxReconTimes;
+    }
+    else
+    {
+        nMaxReconTimes = 7;
+    }
 
     do
     {
         nRet = netframe_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->lPort, nTimeOut); //创建连接
         nTimeOut *= 2;
     }
-    while(nRet != CNV_ERR_OK && nReconTimes++ < 5);
+    while(nRet != CNV_ERR_OK && nReconTimes++ < nMaxReconTimes);
 
     if(nRet != CNV_ERR_OK)
     {
@@ -742,12 +757,24 @@ int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CON
     pSocketElement->uSockElement.tClnSockElement.msg.msg_namelen = sizeof(struct sockaddr_in);
     pSocketElement->uSockElement.tClnSockElement.msg.msg_iov = &(pSocketElement->uSockElement.tClnSockElement.tIovecClnData);
     pSocketElement->uSockElement.tClnSockElement.msg.msg_iovlen = 1;
+    pSocketElement->uSockElement.tClnSockElement.msg.msg_control = pSocketElement->uSockElement.tClnSockElement.strControl;
+    pSocketElement->uSockElement.tClnSockElement.msg.msg_controllen = sizeof(pSocketElement->uSockElement.tClnSockElement.strControl);
+    snprintf(pSvrSockData->tCallback.strProtocol, sizeof(pSvrSockData->tCallback.strProtocol) - 1, "parse_server");
     set_callback_function(SERVER_CALLBACK_FUNC, &(pSvrSockData->tCallback));
     snprintf(pSocketElement->uSockElement.tClnSockElement.strServiceName, sizeof(pSocketElement->uSockElement.tClnSockElement.strServiceName) - 1, "%s", pSvrSockData->strServiceName);
     snprintf(pSocketElement->uSockElement.tClnSockElement.tSvrSockData.strServerIp, sizeof(pSocketElement->uSockElement.tClnSockElement.tSvrSockData.strServerIp) - 1, "%s", pSvrSockData->strServerIp);
     pSocketElement->uSockElement.tClnSockElement.tSvrSockData.lPort = pSvrSockData->lPort;
     pSocketElement->uSockElement.tClnSockElement.pfncnv_parse_protocol = pSvrSockData->tCallback.pfncnv_parse_protocol;
     pSocketElement->uSockElement.tClnSockElement.pfncnv_handle_business = pSvrSockData->tCallback.pfncnv_handle_business;
+
+    if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)     //接收数据缓存
+    {
+        pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer = (char *)malloc(g_params.nMaxBufferSize);
+        if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)
+        {
+            return  CNV_ERR_MALLOC;
+        }
+    }
 
     int ConnId = netframe_get_hashkey(pIoThreadContext->HashConnidFd, &(pIoThreadContext->SeedOfKey));
     char *pKey = (char *)cnv_comm_Malloc(64);

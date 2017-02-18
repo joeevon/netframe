@@ -820,15 +820,15 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
 }
 
 //选择handle线程
-int  io_select_handle_thread(IO_THREAD_CONTEXT *pIoThreadContext, HANDLE_THREAD_CONTEXT **pHandleContexts, CNV_UNBLOCKING_QUEUE  *queuedistribute, HANDLE_THREAD_CONTEXT **pHandleContext)
+int  io_select_handle_thread(IO_THREAD_CONTEXT *pIoThreadContext, HANDLE_THREAD_CONTEXT **pHandleContext)
 {
     int  lThreadIndex = 0;
 
-    char *pThreadIndex = (char *)poll_unblock_queue_head(queuedistribute);
-    push_unblock_queue_tail(queuedistribute, pThreadIndex);    //此处取出后重新插入,达到分配效果
+    char *pThreadIndex = (char *)poll_unblock_queue_head(pIoThreadContext->queDistribute);
+    push_unblock_queue_tail(pIoThreadContext->queDistribute, pThreadIndex);    //此处取出后重新插入,达到分配效果
     lThreadIndex = atoi(pThreadIndex);
     LOG_SYS_DEBUG("io thread %d select handle thread %d", pIoThreadContext->threadindex, lThreadIndex);
-    *pHandleContext = pHandleContexts[lThreadIndex];
+    *pHandleContext = (pIoThreadContext->szHandleContext)[lThreadIndex];
     if(!*pHandleContext)
     {
         return  CNV_ERR_SELECT_THREAD;
@@ -886,7 +886,7 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
 
         if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)    //接收数据缓存
         {
-            pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer = malloc(g_params.nMaxBufferSize);
+            pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer = (char *)malloc(g_params.nMaxBufferSize);
             if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)
             {
                 return  CNV_ERR_MALLOC;
@@ -1080,7 +1080,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         pIOHanldeData->pDataSend = pPacket;
         pIOHanldeData->pfncnv_handle_business = pSocketElement->uSockElement.tClnSockElement.pfncnv_handle_business;
 
-        io_select_handle_thread(pIoThreadContext, pIoThreadContext->szHandleContext, pIoThreadContext->queDistribute, &pHandleContext);
+        io_select_handle_thread(pIoThreadContext, &pHandleContext);
 
         nRet = lockfree_queue_enqueue(&(pHandleContext->io_handle_msgque), pIOHanldeData, 1);   //队列满了把数据丢掉,以免内存泄露
         if(nRet == false)
@@ -1462,7 +1462,6 @@ int io_thread_start(HANDLE_THREAD_CONTEXT *pHandleContexts, IO_THREAD_CONTEXT *p
         pIoThreadContext->threadindex = i + 1;
         snprintf(pIoThreadContext->threadname, sizeof(pIoThreadContext->threadname) - 1, "%s", g_params.tConfigIO.szConfigIOItem[i].strThreadName);  //线程名
         pIoThreadContext->queServer = queServer;
-        pIoThreadContext->nDistributeType = g_params.tConfigIO.szConfigIOItem[i].nDistributeType;
         nRet = hmi_plat_CreateThread((pfnCNV_PLAT_THREAD_RECALL)io_thread_run, &(g_params.tConfigIO.szConfigIOItem[i]), 0, &g_params.tConfigIO.szConfigIOItem[i].ulThreadId, &g_params.tConfigIO.szConfigIOItem[i].ThreadHandle);
         LOG_SYS_INFO("io thread start result:%d", nRet);
     }
