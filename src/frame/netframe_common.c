@@ -485,7 +485,7 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
 
     do
     {
-        nRet = netframe_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->lPort, nTimeOut); //创建连接
+        nRet = netframe_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->nPort, nTimeOut); //创建连接
         nTimeOut *= 2;
     }
     while(nRet != CNV_ERR_OK && nReconTimes++ < nMaxReconTimes);
@@ -500,7 +500,7 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
         nRet = hash_add_conidfd(nSocket, pSvrSockData, pIoThreadContext);  //客户端hashmap
         if(nRet != CNV_ERR_OK)
         {
-            LOG_SYS_ERROR("hash_add_conidfd failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->lPort);
+            LOG_SYS_ERROR("hash_add_conidfd failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->nPort);
             netframe_close_socket(nSocket);
             return -1;
         }
@@ -509,7 +509,7 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
     nRet = hash_add_addrsocket(nSocket, pSvrSockData, pIoThreadContext->HashAddrFd); //服务端hashmap
     if(nRet != CNV_ERR_OK)
     {
-        LOG_SYS_ERROR("hash_add_addrsocket failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->lPort);
+        LOG_SYS_ERROR("hash_add_addrsocket failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->nPort);
         netframe_close_socket(nSocket);
         return -1;
     }
@@ -552,15 +552,15 @@ int  netframe_heart_beat(int timerfd_hearbeat, IO_THREAD_CONTEXT *pIoThreadConte
             snprintf(strKey, sizeof(strKey) - 1, "%s", pSvrSockData->strServerIp);
             cnv_comm_StrcatA(strKey, ":");
             char  strPort[10] = { 0 };
-            snprintf(strPort, sizeof(strPort) - 1, "%d", pSvrSockData->lPort);
+            snprintf(strPort, sizeof(strPort) - 1, "%d", pSvrSockData->nPort);
             cnv_comm_StrcatA(strKey, strPort);
 
             void *pOutValue = NULL;
             int nRet = cnv_hashmap_get(pIoThreadContext->HashAddrFd, strKey, &pOutValue);
-            if(nRet == K_SUCCEED && pSvrSockData->pHeartBeat != NULL && pSvrSockData->lHeartBeatLen > 0)   //能找的到而且心跳包数据存在
+            if(nRet == K_SUCCEED && pSvrSockData->pHeartBeat != NULL && pSvrSockData->nHeartBeatLen > 0)   //能找的到而且心跳包数据存在
             {
                 SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
-                nRet = netframe_write(pSocketElement->Socket, pSvrSockData->pHeartBeat, pSvrSockData->lHeartBeatLen, NULL);
+                nRet = netframe_write(pSocketElement->Socket, pSvrSockData->pHeartBeat, pSvrSockData->nHeartBeatLen, NULL);
                 if(nRet == AGENT_NET_CONNECTION_ABNORMAL)
                 {
                     netframe_reconnect_server(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData, pIoThreadContext);
@@ -706,7 +706,7 @@ int  hash_add_addrsocket(int Socket, SERVER_SOCKET_DATA *pSvrSockData, void *Has
     memset(pKey, 0x00, 32);
     snprintf(pKey, 31, "%s", pSvrSockData->strServerIp);
     cnv_comm_StrcatA(pKey, ":");
-    snprintf(strPort, 9, "%d", pSvrSockData->lPort);
+    snprintf(strPort, 9, "%d", pSvrSockData->nPort);
     cnv_comm_StrcatA(pKey, strPort);
 
     SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)cnv_comm_Malloc(sizeof(SOCKET_ELEMENT));
@@ -763,7 +763,7 @@ int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CON
     set_callback_function(SERVER_CALLBACK_FUNC, &(pSvrSockData->tCallback));
     snprintf(pSocketElement->uSockElement.tClnSockElement.strServiceName, sizeof(pSocketElement->uSockElement.tClnSockElement.strServiceName) - 1, "%s", pSvrSockData->strServiceName);
     snprintf(pSocketElement->uSockElement.tClnSockElement.tSvrSockData.strServerIp, sizeof(pSocketElement->uSockElement.tClnSockElement.tSvrSockData.strServerIp) - 1, "%s", pSvrSockData->strServerIp);
-    pSocketElement->uSockElement.tClnSockElement.tSvrSockData.lPort = pSvrSockData->lPort;
+    pSocketElement->uSockElement.tClnSockElement.tSvrSockData.nPort = pSvrSockData->nPort;
     pSocketElement->uSockElement.tClnSockElement.pfncnv_parse_protocol = pSvrSockData->tCallback.pfncnv_parse_protocol;
     pSocketElement->uSockElement.tClnSockElement.pfncnv_handle_business = pSvrSockData->tCallback.pfncnv_handle_business;
 
@@ -843,7 +843,7 @@ int netframe_reconnect_server(SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CONTEX
     snprintf(strHashKey, sizeof(strHashKey) - 1, "%s", pSvrSockData->strServerIp);
     cnv_comm_StrcatA(strHashKey, ":");
     char strPort[10] = { 0 };
-    snprintf(strPort, sizeof(strPort) - 1, "%d", pSvrSockData->lPort);
+    snprintf(strPort, sizeof(strPort) - 1, "%d", pSvrSockData->nPort);
     cnv_comm_StrcatA(strHashKey, strPort);
     remove_server_socket_hashmap(pIoThreadContext->Epollfd, pIoThreadContext->HashAddrFd, strHashKey);
 

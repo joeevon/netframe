@@ -33,5 +33,4 @@ mkdir -p $BUILD_DIR/$BUILD_TYPE \
            --no-warn-unused-cli \
            $SOURCE_DIR \
   && make
-  
-#cp $SOURCE_DIR/publish/$BUILD_TYPE/lib/* $SOURCE_DIR/lib
+

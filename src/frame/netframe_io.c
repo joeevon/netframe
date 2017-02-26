@@ -412,7 +412,7 @@ void refresh_long_connect(IO_THREAD_CONTEXT *pIoThreadContext, CNV_UNBLOCKING_QU
                 SERVER_SOCKET_DATA *ptOriSvrSockData = (SERVER_SOCKET_DATA *)poll_unblock_queue_head(pIoThreadContext->queServer);
                 push_unblock_queue_tail(pIoThreadContext->queServer, ptOriSvrSockData);
 
-                if(!strcmp(ptNewSvrSockData->strServerIp, ptOriSvrSockData->strServerIp) && ptNewSvrSockData->lPort == ptOriSvrSockData->lPort)
+                if(!strcmp(ptNewSvrSockData->strServerIp, ptOriSvrSockData->strServerIp) && ptNewSvrSockData->nPort == ptOriSvrSockData->nPort)
                 {
                     bIsServerExist = K_TRUE;
                     break;
@@ -524,7 +524,7 @@ int respond_write_next_server(SERVER_SOCKET_DATA *pSvrSockData, HANDLE_TO_IO_DAT
                 SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)(entry->value))->pValue);
                 if(strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strServiceName, pSvrSockData->strServiceName) == 0
                         && (strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strServerIp, pSvrSockData->strServerIp) != 0
-                            || pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->lPort != pSvrSockData->lPort))  //同一类服务器
+                            || pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->nPort != pSvrSockData->nPort))  //同一类服务器
                 {
                     nRet = netframe_write(pSocketElement->Socket, pHandleIOData->pDataSend, pHandleIOData->lDataLen, &nLenAlreadyWrite);
                     if(nRet == CNV_ERR_OK)
@@ -544,7 +544,7 @@ int respond_write_next_server(SERVER_SOCKET_DATA *pSvrSockData, HANDLE_TO_IO_DAT
                         }
                         else if(nRet == AGENT_NET_CONNECTION_ABNORMAL)       //连接异常
                         {
-                            LOG_SYS_ERROR("connection to %s:%d is abnormal!", pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strServerIp, pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->lPort);
+                            LOG_SYS_ERROR("connection to %s:%d is abnormal!", pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strServerIp, pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->nPort);
                         }
                     }
                 }
@@ -573,7 +573,7 @@ int respond_write_server_again(SERVER_SOCKET_DATA *pSvrSockData, HANDLE_TO_IO_DA
     snprintf(strHashKey, sizeof(strHashKey) - 1, "%s", pSvrSockData->strServerIp);
     cnv_comm_StrcatA(strHashKey, ":");
     char strPort[10] = { 0 };
-    snprintf(strPort, sizeof(strPort) - 1, "%d", pSvrSockData->lPort);
+    snprintf(strPort, sizeof(strPort) - 1, "%d", pSvrSockData->nPort);
     cnv_comm_StrcatA(strHashKey, strPort);
     nRet = cnv_hashmap_get(pIoThreadContext->HashAddrFd, strHashKey, &pOutValue);
     if(nRet != K_SUCCEED)
@@ -633,7 +633,7 @@ int respond_write_server(int Epollfd, char *pOutValue, HANDLE_TO_IO_DATA *pHandl
         else if(nRet == AGENT_NET_CONNECTION_ABNORMAL)    //连接异常
         {
             SERVER_SOCKET_DATA *pSvrSockData = (SERVER_SOCKET_DATA *)(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData);
-            LOG_SYS_ERROR("connect is abnormal! ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->lPort);
+            LOG_SYS_ERROR("connect is abnormal! ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->nPort);
 
             nRet = respond_write_server_again(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData, pHandleIOData, pIoThreadContext);  //重连,再写一次
             if(nRet != CNV_ERR_OK)
@@ -661,7 +661,7 @@ SERVER_SOCKET_DATA *get_svrsockdata_from_queue(HANDLE_TO_IO_DATA *ptHandleIOData
     while(queuenode)
     {
         SERVER_SOCKET_DATA *ptSvrSockData = (SERVER_SOCKET_DATA *)queuenode->data_;
-        if(!strcmp(ptSvrSockData->strServerIp, ptHandleIOData->strServIp) && ptSvrSockData->lPort == ptHandleIOData->ulPort)
+        if(!strcmp(ptSvrSockData->strServerIp, ptHandleIOData->strServIp) && ptSvrSockData->nPort == ptHandleIOData->ulPort)
         {
             return ptSvrSockData;
         }
