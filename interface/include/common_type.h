@@ -22,6 +22,7 @@ extern "C"
 #include "cnv_base_define.h"
 #include "cnv_unblock_queue.h"
 #include "cnv_blocking_queue.h"
+#include "cnv_lock_free_queue.h"
 #include <stdint.h>
 
 #define  DEFAULT_HASHMAP_CAPCITY  30000    //默认hashmap大小 
@@ -64,7 +65,8 @@ extern "C"
     } MONITOR_ELEMENT;
 
     struct  __IO_TO_HANDLE_DATA;
-    struct __HANDLE_TO_IO_HEAD;
+    struct __HANDLE_TO_IO_DATA;
+    struct __STATISTICS_QUEQUE_DATA;
 
     /*=======================================================
     功能:
@@ -81,7 +83,7 @@ extern "C"
         0    成功
         其它 失败
         =========================================================*/
-    typedef int (*pfnCNV_PARSE_PROTOCOL)(char **ppDataBuff, unsigned int *pnDataSize, char **ppPacket, unsigned int  *pnPacketSize, void **ppAuxiliary);
+    typedef int (*pfnCNV_PARSE_PROTOCOL)(char **ppDataBuff, unsigned int *pnDataSize, char **ppPacket, unsigned int  *pnPacketSize);
 
     /*=======================================================
     功能:
@@ -89,20 +91,28 @@ extern "C"
         queuerespond里的数据有业务申请内存，框架释放
     参数:
       =========================================================*/
-    typedef void (*pfnCNV_HANDLE_BUSINESS)(const struct __IO_TO_HANDLE_DATA *ptHandleIoData, CNV_UNBLOCKING_QUEUE *queuerespond, void *pHandleParam);
+    typedef void (*pfnCNV_HANDLE_BUSINESS)(const struct __IO_TO_HANDLE_DATA *ptIoHandleData, CNV_UNBLOCKING_QUEUE *queuerespond, void *pHandleParam);
 
     /*=======================================================
     功能:
-        定时触发回调函数
+        辅助线程回调函数
+        queuerespond里的数据有业务申请内存，框架释放
+    参数:
+    =========================================================*/
+    typedef void(*pfnCNV_STATISTICS_CALLBACK)(const struct __STATISTICS_QUEQUE_DATA *ptStatisQueData, uint32_t nStatisThreadNum, CNV_UNBLOCKING_QUEUE *queuerespond);
+
+    /*=======================================================
+    功能:
+        handle定时触发回调函数
      =========================================================*/
-    typedef void (*pfnCNV_CALLBACK_FUNCTION)(CNV_UNBLOCKING_QUEUE *queuerespond, void *CallbakParam);
+    typedef void (*pfnCNV_HANDLE_CALLBACK)(struct __STATISTICS_QUEQUE_DATA **ptStatisQueData, void *pBusiHandleParam);
 
     /*=======================================================
     功能:
         发送失败回调函数
         queuerespond里的数据有业务申请内存，框架释放
     =========================================================*/
-    typedef void (*pfnSEND_FAILED_CALLBACK)(CNV_UNBLOCKING_QUEUE *queuerespond, const struct __HANDLE_TO_IO_HEAD *pHandleIOData);
+    typedef void (*pfnSEND_FAILED_CALLBACK)(CNV_UNBLOCKING_QUEUE *queuerespond, const struct __HANDLE_TO_IO_DATA *pHandleIOData);
 
     /*=======================================================
     功能:
@@ -110,7 +120,7 @@ extern "C"
         此处是io调用的回调函数，用handle给io的结构体也使用，便于请求服务的处理
         ptHandleIoData由业务申请内存，框架释放
     =========================================================*/
-    typedef int(*pfnCNV_MONITOR_CALLBACK)(MONITOR_ELEMENT *ptMonitorElement, struct __HANDLE_TO_IO_HEAD **ptHandleIoData);
+    typedef void(*pfnCNV_MONITOR_CALLBACK)(MONITOR_ELEMENT *ptMonitorElement, struct __STATISTICS_QUEQUE_DATA **ptStatisQueData);
 
     /*=======================================================
     功能:
@@ -135,14 +145,6 @@ extern "C"
     =========================================================*/
     extern int init_handle_params(void **pHandleParams);
 
-    /*=======================================================
-    功能:
-        io设置监控回调函数
-    说明:
-        无需监控回调函数，置空实现
-    =========================================================*/
-    extern void ioset_monitor_callback(pfnCNV_MONITOR_CALLBACK *pfncnv_monitor_callback);
-
     //hashmap value
     typedef  struct  __HASHMAP_VALUE
     {
@@ -157,15 +159,18 @@ extern "C"
         char strProtocol[DEFAULT_ARRAY_SIZE];
         pfnCNV_PARSE_PROTOCOL pfncnv_parse_protocol;
         pfnCNV_HANDLE_BUSINESS pfncnv_handle_business;
+        pfnCNV_MONITOR_CALLBACK pfncnv_monitor_callback;
+        pfnCNV_STATISTICS_CALLBACK pfncnv_statistics_callback;
     } CALLBACK_STRUCT_T;
 
     typedef  struct  __SERVER_SOCKET_DATA
     {
         K_BOOL isReqLogin;   //是否发送登录请求
         K_BOOL isRecvSvrData;  //服务端向客户端推送数据
-        time_t nStartConnect;   //开始连接时间
-        int  lPort;   //端口
-        int  lHeartBeatLen;   //心跳包长度
+        int nMaxReconTimes;  //最大重连次数  0 ~ 7
+        int nTimeOut;  //连接超时时长,microsecond  0 ~ 70000
+        int  nPort;   //端口
+        int  nHeartBeatLen;   //心跳包长度
         char *pHeartBeat;    //心跳包数据
         char strServerIp[DEFAULT_ARRAY_SIZE];   //服务器IP
         char strServiceName[DEFAULT_ARRAY_SIZE];  //服务名字,供找同类服务器使用
@@ -193,7 +198,7 @@ extern "C"
     } IO_TO_HANDLE_DATA;
 
     //HANDLE_RESPOND_T   HANDLE -> IO
-    typedef  struct  __HANDLE_TO_IO_HEAD
+    typedef  struct  __HANDLE_TO_IO_DATA
     {
         int lAction;   //请求动作(1:发送服务请求 2:客户端应答 3:关闭客户端)
         int lConnectID;    //连接ID
@@ -203,11 +208,17 @@ extern "C"
         char *pDataSend;  //要发送的数据
         void *pCallbackPara;   //回调参数
         int io_thread_index;  //IO线程ID
-        pfnCNV_CALLBACK_FUNCTION pfn_handle_callback;  //handle给io的回调函数
         pfnSEND_FAILED_CALLBACK pfnsend_failed_callback;   //发送失败回调函数
         int nReserveOne;   //保留变量
         int nReserverTwo;   //保留变量
     } HANDLE_TO_IO_DATA;
+
+    //STATISTICS QUEUE DATA
+    typedef struct __STATISTICS_QUEQUE_DATA
+    {
+        char *pData;
+        int32_t nDataLen;
+    } STATISTICS_QUEQUE_DATA;
 
     //TIMER STRUCT
     typedef struct  __TIMER_STRUCT
@@ -237,7 +248,7 @@ extern "C"
     {
         TIMER_STRUCT  tTimer;
         char strTaskName[64];
-        pfnCNV_CALLBACK_FUNCTION  pfn_timertask_cb;   //定时任务回调函数
+        pfnCNV_HANDLE_CALLBACK  pfn_timertask_cb;   //定时任务回调函数
     } HANDLE_TIMER_TASK;
 
     //handle线程参数

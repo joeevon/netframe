@@ -24,7 +24,7 @@ Author: zhhuang@careland.com.cn
 extern "C" {
 #endif
 
-//#include "netframe/cnv_base_define.h"
+//#include "cnv_base_define.h"
 #include "cnv_queue_type.h"
 
     typedef struct blocking_queue_t
