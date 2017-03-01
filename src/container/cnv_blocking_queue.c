@@ -142,9 +142,8 @@ void *poll_block_queue_head(CNV_BLOCKING_QUEUE *queue, int seconds)
 
 int get_block_queue_count(CNV_BLOCKING_QUEUE *queue)
 {
-    int size = -1;
-    if(!lock_block_queue(queue)) return size;
-    size = queue->unblockqueue->size_;
+    if(!lock_block_queue(queue)) return -1;
+    int size = queue->unblockqueue->size_;
     pthread_mutex_unlock(&queue->mutex_);
     return size;
 }
@@ -152,16 +151,16 @@ int get_block_queue_count(CNV_BLOCKING_QUEUE *queue)
 bool lock_block_queue(CNV_BLOCKING_QUEUE *queue)
 {
     assert(queue);
-    bool result = false;
     if(0 != pthread_mutex_lock(&queue->mutex_))
     {
         int err = errno;
         if(err == EBUSY || err == EDEADLK)
         {
-            return result;
+            return false;
         }
     }
-    return result = true;
+
+    return true;
 }
 
 void unlock_block_queue(CNV_BLOCKING_QUEUE *queue)

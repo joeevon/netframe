@@ -597,7 +597,6 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
 {
     LOG_SYS_DEBUG("iothread_handle_respond.");
     int  nRet = CNV_ERR_OK;
-    uint64_t  ulData = 0;
     char  *pOutValue = NULL;
     CNV_UNBLOCKING_QUEUE *unblockqueue = NULL;
 
@@ -620,10 +619,6 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
     while(lNumOfRepMsg--)
     {
         HANDLE_TO_IO_DATA *pHandleIOData = (HANDLE_TO_IO_DATA *)poll_unblock_queue_head(unblockqueue);
-        if(pHandleIOData == NULL)    // 可能为空消息
-        {
-            continue;
-        }
 
         if(pHandleIOData->lAction == REQUEST_SERVICE)     //服务请求
         {
@@ -726,13 +721,14 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
     }
     pIoThreadContext->tMonitorElement.nRespondTimes++;
 
-    if(get_block_queue_count(handle_io_msgque) <= 0)
+    if(lock_block_queue(handle_io_msgque) == true)
     {
-        nRet = read(Eventfd, &ulData, sizeof(uint64_t));   //此数无用,读出缓存消息,避免epoll重复提醒
-        if(nRet != sizeof(uint64_t))
+        if(handle_io_msgque->unblockqueue->size_ <= 0)
         {
-            LOG_SYS_FATAL("io read eventfd failed,%s.", strerror(errno));
+            uint64_t  ulData = 0;
+            nRet = read(Eventfd, &ulData, sizeof(uint64_t));   //此数无用,读出缓存消息,避免epoll重复提醒
         }
+        unlock_block_queue(handle_io_msgque);
     }
 
     LOG_SYS_DEBUG("iothread_handle_respond end.");
@@ -1001,8 +997,8 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
             continue;
         }
 
-        uint64_t ulWakeup = 1;   //任意值,无实际意义
-        write(pHandleContext->io_handle_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒handle
+        uint64_t  ulWakeup = 1;   //任意值,无实际意义
+        nRet = write(pHandleContext->io_handle_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒handle
     }
 
     LOG_SYS_DEBUG("iothread_handle_read end.");

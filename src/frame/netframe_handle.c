@@ -62,8 +62,7 @@ void handlethread_handle_iomsg(int  EventfdIo, void *pBusinessParams, HANDLE_THR
     IO_TO_HANDLE_DATA *pIOHanldeData = (IO_TO_HANDLE_DATA *)lockfree_queue_dequeue(&pHandleContext->io_handle_msgque, 1);
     if(pIOHanldeData == NULL)  //handle队列中没有数据了
     {
-        uint64_t  ulData = 0;
-        read(EventfdIo, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
+        usleep(10);
         return;
     }
 
@@ -90,8 +89,8 @@ void handlethread_handle_iomsg(int  EventfdIo, void *pBusinessParams, HANDLE_THR
 
     if(bIsWakeIO)
     {
-        uint64_t ulWakeup = 0;
-        write(pIOHanldeData->handle_io_eventfd, &ulWakeup, sizeof(uint64_t));  //handle唤醒io
+        uint64_t ulWakeup = 1;
+        nRet = write(pIOHanldeData->handle_io_eventfd, &ulWakeup, sizeof(uint64_t));  //handle唤醒io
     }
 
     free(pIOHanldeData->pDataSend);
