@@ -83,7 +83,7 @@ extern "C"
         0    成功
         其它 失败
         =========================================================*/
-    typedef int (*pfnCNV_PARSE_PROTOCOL)(char **ppDataBuff, unsigned int *pnDataSize, char **ppPacket, unsigned int  *pnPacketSize);
+    typedef int (*pfnCNV_PARSE_PROTOCOL)(char **ppDataBuff, int *pnDataSize, char **ppPacket, unsigned int  *pnPacketSize);
 
     /*=======================================================
     功能:
@@ -194,8 +194,6 @@ extern "C"
         CNV_BLOCKING_QUEUE *handle_io_msgque;  // handle写io消息队列
         pfnCNV_HANDLE_BUSINESS pfncnv_handle_business;  //业务处理回调函数
         pfnSEND_FAILED_CALLBACK pfnsend_failed_callback;  //发送失败对调函数
-        int nReserveOne;   //保留变量
-        uint64_t  nReserverTwo;   //保留变量
     } IO_TO_HANDLE_DATA;
 
     //HANDLE_RESPOND_T   HANDLE -> IO
@@ -210,8 +208,6 @@ extern "C"
         void *pCallbackPara;   //回调参数
         int io_thread_index;  //IO线程ID
         pfnSEND_FAILED_CALLBACK pfnsend_failed_callback;   //发送失败回调函数
-        int nReserveOne;   //保留变量
-        int nReserverTwo;   //保留变量
     } HANDLE_TO_IO_DATA;
 
     //STATISTICS QUEUE DATA

@@ -60,21 +60,16 @@ void  free_iohandle_lockfreequeue(LOCKFREE_QUEUE  *io_handle_msgque)
 void handlethread_handle_iomsg(int  EventfdIo, void *pBusinessParams, HANDLE_THREAD_CONTEXT *pHandleContext)
 {
     IO_TO_HANDLE_DATA *pIOHanldeData = (IO_TO_HANDLE_DATA *)lockfree_queue_dequeue(&pHandleContext->io_handle_msgque, 1);
-    if(pIOHanldeData == NULL)
+    if(pIOHanldeData == NULL)  //handle队列中没有数据了
     {
         uint64_t  ulData = 0;
-        int32_t nRet = read(EventfdIo, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
-        if(nRet != sizeof(uint64_t))
-        {
-            LOG_SYS_FATAL("handle read eventfd failed,%s.", strerror(errno));
-        }
+        read(EventfdIo, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
         return;
     }
 
     pIOHanldeData->pfncnv_handle_business(pIOHanldeData, &pHandleContext->queuerespond, pBusinessParams);  //执行回调函数
 
     int nRet = CNV_ERR_OK;
-    uint64_t ulWakeup = 1;  //任意值,无实际意义
     K_BOOL bIsWakeIO = K_FALSE;
     int nNumOfPostMsg = get_unblock_queue_count(&pHandleContext->queuerespond);
     LOG_SYS_DEBUG("nNumOfPostMsg = %d", nNumOfPostMsg);
@@ -95,12 +90,8 @@ void handlethread_handle_iomsg(int  EventfdIo, void *pBusinessParams, HANDLE_THR
 
     if(bIsWakeIO)
     {
-        nRet = write(pIOHanldeData->handle_io_eventfd, &ulWakeup, sizeof(ulWakeup));  //handle唤醒io
-        if(nRet != sizeof(ulWakeup))
-        {
-            LOG_SYS_ERROR("handle wake io failed.");
-        }
-        bIsWakeIO = K_FALSE;
+        uint64_t ulWakeup = 0;
+        write(pIOHanldeData->handle_io_eventfd, &ulWakeup, sizeof(uint64_t));  //handle唤醒io
     }
 
     free(pIOHanldeData->pDataSend);

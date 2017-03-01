@@ -280,10 +280,8 @@ int respond_write_client(int Epollfd, char *pOutValue, HANDLE_TO_IO_DATA *pHandl
 {
     LOG_SYS_DEBUG("respond_write_client.");
     SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
-    pSocketElement->uSockElement.tClnSockElement.nReserveOne = pHandleIOData->nReserveOne;
-    pSocketElement->uSockElement.tClnSockElement.nReserverTwo = pHandleIOData->nReserverTwo;
-    int nLenAlreadyWrite = 0;
 
+    int nLenAlreadyWrite = 0;
     int nRet = netframe_write(pSocketElement->Socket, pHandleIOData->pDataSend, pHandleIOData->lDataLen, &nLenAlreadyWrite);
     if(nRet == CNV_ERR_OK)
     {
@@ -884,20 +882,17 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
 }
 
 // 接收数据
-int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THREAD_CONTEXT *pIoThreadContext)
+int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConnidFd, IO_THREAD_CONTEXT *pIoThreadContext)
 {
     LOG_SYS_DEBUG("iothread_handle_read.");
-    int nDataReadLen = 0;
-    unsigned int nPacketSize = 0;
-    void  *pOutValue = NULL;
-    char *pPacket = NULL;
-    HANDLE_THREAD_CONTEXT *pHandleContext = NULL;
 
-    int nRet = cnv_hashmap_get(HashConnidFd, pConnId, &pOutValue);  //用connid获取socket相关结构体
-    if(nRet != K_SUCCEED)
+    void *pOutValue = NULL;
+    if(cnv_hashmap_get(HashConnidFd, pConnId, &pOutValue) != K_SUCCEED)  //用connid获取socket相关结构体
     {
         LOG_SYS_DEBUG("threadid:%d,hashmap can not get value! HashConnidFd.size=%d", pIoThreadContext->threadindex, cnv_hashmap_size(HashConnidFd));
         cnv_hashmap_iterator(HashConnidFd, printhashmap, NULL);
+        netframe_delete_event(Epollfd, nSocket);
+        netframe_close_socket(nSocket);
         return CNV_ERR_HASHMAP_GET;
     }
     SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
@@ -907,7 +902,8 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
     pmsg->msg_iov->iov_len = g_params.nMaxBufferSize - ptClnSockData->lDataRemain;    //剩余缓存长度
     memset(pmsg->msg_iov->iov_base, 0, pmsg->msg_iov->iov_len);
 
-    nRet = netframe_recvmsg(pSocketElement->Socket, pmsg, &nDataReadLen);  //接收数据
+    int nDataReadLen = 0;
+    int nRet = netframe_recvmsg(nSocket, pmsg, &nDataReadLen);  //接收数据
     if(nRet != CNV_ERR_OK)
     {
         if(nRet == AGENT_NET_CLIENT_CLOSED)   //客户端关闭
@@ -924,34 +920,22 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
             LOG_SYS_FATAL("threadid:%d, read failed!", pIoThreadContext->threadindex);
             remove_client_socket_hashmap(Epollfd, HashConnidFd, pConnId);
         }
+
         return nRet;
     }
 
-    //udp 获取对端ip
-    //struct sockaddr_in *ptClientAddr = (struct sockaddr_in *)(pmsg->msg_name);
-    //LOG_SYS_DEBUG("peer ip:%s", inet_ntoa(ptClientAddr->sin_addr));
-    //char strClientIp[32] = { 0 };
-    //memcpy(strClientIp, inet_ntoa(ptClientAddr->sin_addr), sizeof(strClientIp) - 1);
-
-    pIoThreadContext->tMonitorElement.lRecvPackNum++;
     pSocketElement->Time = cnv_comm_get_utctime();  //收、发数据后重置时间戳
-    LOG_SYS_DEBUG("lDataRemain:%d, read data length:%d", ptClnSockData->lDataRemain, nDataReadLen);
-
+    pIoThreadContext->tMonitorElement.lRecvPackNum++;
     ptClnSockData->pMovePointer = ptClnSockData->pDataBuffer;
     ptClnSockData->lDataRemain += nDataReadLen;
+    LOG_SYS_DEBUG("lDataRemain:%d, read data length:%d", ptClnSockData->lDataRemain, nDataReadLen);
+
     pfnCNV_PARSE_PROTOCOL pfncnvparseprotocol = pSocketElement->uSockElement.tClnSockElement.pfncnv_parse_protocol;  //协议解析回调函数
-    if(!pfncnvparseprotocol)
-    {
-        LOG_SYS_INFO("pfncnvparseprotocol is empty.");
-        ptClnSockData->lDataRemain = 0;
-        return CNV_ERR_OK;
-    }
 
     while(ptClnSockData->lDataRemain > 0)
     {
-        ptClnSockData->pMovePointer += nPacketSize; //数据缓存指针偏移
-        pPacket = NULL;
-        nPacketSize = 0;
+        char *pPacket = NULL;
+        unsigned int nPacketSize = 0;
         nRet = pfncnvparseprotocol(&(ptClnSockData->pMovePointer), &(ptClnSockData->lDataRemain), &pPacket, &nPacketSize);  //协议解析
         if(nRet != CNV_PARSE_SUCCESS)
         {
@@ -974,6 +958,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
             else if(nRet == CNV_PARSE_MOVE)     //数据偏移
             {
                 ptClnSockData->lDataRemain -= nPacketSize;      //总数据长度减去一个包的数据大小
+                ptClnSockData->pMovePointer += nPacketSize; //数据缓存指针偏移
                 continue;
             }
             else if(nRet == CNV_PARSE_ERROR)    //解析错误,关闭客户端
@@ -984,15 +969,18 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
             break;
         }
 
+        if(nPacketSize > ptClnSockData->lDataRemain)
+        {
+            LOG_SYS_ERROR("nPacketSize larger than lDataRemain.");
+            remove_client_socket_hashmap(Epollfd, HashConnidFd, pConnId);
+            break;
+        }
+
         ptClnSockData->lDataRemain -= nPacketSize;      //总数据长度减去一个包的数据大小
+        ptClnSockData->pMovePointer += nPacketSize; //数据缓存指针偏移
         pIoThreadContext->tMonitorElement.lParsePackNum++;
 
         IO_TO_HANDLE_DATA *pIOHanldeData = (IO_TO_HANDLE_DATA *)malloc(sizeof(IO_TO_HANDLE_DATA));    //io->handle  header
-        if(pIOHanldeData == NULL)
-        {
-            free(pPacket);
-            return CNV_ERR_MALLOC;
-        }
         pIOHanldeData->lConnectID = atoi((char *)pConnId);
         memcpy(pIOHanldeData->strServIp, pSocketElement->uSockElement.tClnSockElement.strClientIp, sizeof(pIOHanldeData->strServIp) - 1);
         pIOHanldeData->ulPort = pSocketElement->uSockElement.tClnSockElement.uClientPort;
@@ -1002,6 +990,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         pIOHanldeData->pDataSend = pPacket;
         pIOHanldeData->pfncnv_handle_business = pSocketElement->uSockElement.tClnSockElement.pfncnv_handle_business;
 
+        HANDLE_THREAD_CONTEXT *pHandleContext = NULL;
         io_select_handle_thread(pIoThreadContext, &pHandleContext);
 
         nRet = lockfree_queue_enqueue(&(pHandleContext->io_handle_msgque), pIOHanldeData, 1);   //队列满了把数据丢掉,以免内存泄露
@@ -1015,11 +1004,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, void *HashConnidFd, IO_THRE
         }
 
         uint64_t ulWakeup = 1;   //任意值,无实际意义
-        nRet = write(pHandleContext->io_handle_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒handle
-        if(nRet != sizeof(ulWakeup))
-        {
-            LOG_SYS_FATAL("io wake up handle failed !");
-        }
+        write(pHandleContext->io_handle_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒handle
     }
 
     LOG_SYS_DEBUG("iothread_handle_read end.");
@@ -1219,12 +1204,7 @@ int  io_thread_run(void *pThreadParameter)
                     }
                     else     //客户端消息
                     {
-                        nRet = iothread_handle_read(Epollfd, szEpollEvent[i].data.ptr, HashConnidFd, pIoThreadContext);
-                        if(nRet == CNV_ERR_HASHMAP_GET)
-                        {
-                            netframe_delete_event(Epollfd, szEpollEvent[i].data.fd);
-                            netframe_close_socket(szEpollEvent[i].data.fd);
-                        }
+                        iothread_handle_read(Epollfd, szEpollEvent[i].data.ptr, szEpollEvent[i].data.fd, HashConnidFd, pIoThreadContext);
                     }
                 }
                 else if(szEpollEvent[i].events & EPOLLRDHUP)   //对端关闭

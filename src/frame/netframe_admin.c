@@ -432,7 +432,7 @@ void admin_handle_data(const IO_TO_HANDLE_DATA *req, CNV_UNBLOCKING_QUEUE *queue
     push_unblock_queue_tail(queuerespond, pHandleIOData);
 }
 
-int admin_parse_data(char **ppDataBuff, unsigned int *pnDataSize, char **ppPacket, unsigned int *pnPacketSize)
+int admin_parse_data(char **ppDataBuff, int *pnDataSize, char **ppPacket, unsigned int *pnPacketSize)
 {
     *ppPacket = (char *)cnv_comm_Malloc(*pnDataSize);
     if(!*ppPacket)

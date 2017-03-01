@@ -211,7 +211,7 @@ extern "C"
 
     typedef  struct  __CLIENT_SOCKET_DATA
     {
-        unsigned int  lDataRemain;       //剩下的数据长度(不完整的包)
+        int  lDataRemain;       //剩下的数据长度(不完整的包)
         char  *pDataBuffer;       //数据缓冲
         char  *pMovePointer;   //移动遍历的指针
     } CLIENT_SOCKET_DATA;
@@ -232,8 +232,6 @@ extern "C"
         CLIENT_SOCKET_DATA SocketData;  //相关读数据
         pfnCNV_PARSE_PROTOCOL  pfncnv_parse_protocol;   //协议解析回调函数
         pfnCNV_HANDLE_BUSINESS  pfncnv_handle_business;   //业务处理回调函数
-        int  nReserveOne;   //保留变量
-        int  nReserverTwo;   //保留变量
     } CLIENT_SOCKET_ELEMENT;
 
     typedef  struct  __SERVER_SOCKET_ELEMENT
