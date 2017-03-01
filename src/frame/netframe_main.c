@@ -156,7 +156,7 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
     }
     LOG_SYS_DEBUG("io_thread_start ok.");
 
-    //开启accept线程
+    //accept
     nRet = accept_thread_start(g_szIoThreadContexts, &g_tAcceptContext);
     if(nRet != CNV_ERR_OK)
     {

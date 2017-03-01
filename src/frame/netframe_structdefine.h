@@ -68,8 +68,8 @@ extern "C"
     typedef  struct  __HANDLE_THREAD_ITEM
     {
         char  strThreadName[DEFAULT_ARRAY_SIZE];
-		int  lThreadIndex;     //开启线时自定义的序号
-		int nIsStasistics;   //是否统计
+        int  lThreadIndex;     //开启线时自定义的序号
+        int nIsStasistics;   //是否统计
         pthread_t  ulThreadId;    //线程ID
         void   *ThreadHandle;
         HANDLE_THREAD_CONTEXT  *pHandleContext;  //线程环境
@@ -219,8 +219,6 @@ extern "C"
     // CLIENT_SOCKET_ELEMENT
     typedef  struct  __CLIENT_SOCKET_ELEMENT
     {
-        int   lWriteRemain;   //未写完数据的长度
-        char  *pWriteRemain;  //未写完的数据
         char  strTransmission[DEFAULT_ARRAY_SIZE];     //传输协议,IO需根据传输协议来收数据
         char  strProtocol[DEFAULT_ARRAY_SIZE]; //服务协议
         char strServiceName[DEFAULT_ARRAY_SIZE];  //服务名字,供找同类服务器使用
@@ -231,7 +229,6 @@ extern "C"
         struct iovec tIovecClnData;
         struct msghdr msg;       //数据内容
         char strControl[CMSG_SPACE(sizeof(struct in_pktinfo))];
-        SERVER_SOCKET_DATA tSvrSockData;
         CLIENT_SOCKET_DATA SocketData;  //相关读数据
         pfnCNV_PARSE_PROTOCOL  pfncnv_parse_protocol;   //协议解析回调函数
         pfnCNV_HANDLE_BUSINESS  pfncnv_handle_business;   //业务处理回调函数
@@ -241,8 +238,6 @@ extern "C"
 
     typedef  struct  __SERVER_SOCKET_ELEMENT
     {
-        int  lWriteRemain;
-        char *pWriteRemain;
         struct sockaddr_in tServerAddr;
         struct iovec szIovecSvrData[2];
         struct msghdr msg;       //数据内容

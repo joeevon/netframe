@@ -515,19 +515,19 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
                 }
                 else if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))
                 {
-                    LOG_SYS_ERROR("%s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                 }
                 else if(szEpollEvent[i].events & POLLNVAL)
                 {
-                    LOG_SYS_ERROR("%s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                 }
                 else if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
                 {
-                    LOG_SYS_ERROR("%s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                 }
                 else
                 {
-                    LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                 }
             }
 
@@ -535,7 +535,7 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
         }
         else if(nCount < 0)
         {
-            LOG_SYS_ERROR("%s", strerror(errno));
+            LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
         }
 
         int nNumOfEvent = get_unblock_queue_count(queEventfds);
@@ -591,6 +591,10 @@ void  accept_thread_uninit(ACCEPT_THREAD_CONTEXT *pAcceptContext)
     {
         free_unblock_queue(pAcceptContext->pConfigAcceptItem[i].queDistribute);
         cnv_comm_Free(pAcceptContext->pConfigAcceptItem[i].queDistribute);
+        if(strcmp(pAcceptContext->pConfigAcceptItem[i].strTransmission, "UNIXSOCKET") == 0)
+        {
+            unlink(pAcceptContext->pConfigAcceptItem[i].strUnixDomainPath);
+        }
     }
     free_unblock_queue(pAcceptContext->queEventfds);
     cnv_comm_Free(pAcceptContext->queEventfds);

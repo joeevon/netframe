@@ -110,7 +110,17 @@ extern "C"
         0    成功
         其它 失败
     =========================================================*/
-    int netframe_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int nTimeOut);
+    int netframe_tcp_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int nTimeOut);
+
+    /*=======================================================
+    功能:
+    unixsocket连接
+    参数:
+    返回值:
+    0    成功
+    其它 失败
+    =========================================================*/
+    int netframe_unixsocket_connect(int *pSocket, char *strUnixdomain);
 
     /*=======================================================
     功能:

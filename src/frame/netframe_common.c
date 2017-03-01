@@ -462,40 +462,47 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
     int nSocket = 0;
     int nRet = -1;
 
-    int nTimeOut = 0;  //microsecond
-    if(pSvrSockData->nTimeOut > 0 && pSvrSockData->nTimeOut <= 70000)
+    if(strlen(pSvrSockData->strProtocol) == 0 || strcmp(pSvrSockData->strProtocol, "TCP") == 0)   //默认tcp协议
     {
-        nTimeOut = pSvrSockData->nTimeOut;
-    }
-    else
-    {
-        nTimeOut = 70000;
-    }
+        int nTimeOut = 0;  //microsecond
+        if(pSvrSockData->nTimeOut > 0 && pSvrSockData->nTimeOut <= 70000)
+        {
+            nTimeOut = pSvrSockData->nTimeOut;
+        }
+        else
+        {
+            nTimeOut = 70000;
+        }
 
-    int nReconTimes = 1;  //重连次数
-    int nMaxReconTimes = 0;  //最大重连次数
-    if(pSvrSockData->nMaxReconTimes > 0 && pSvrSockData->nMaxReconTimes <= 7)
-    {
-        nMaxReconTimes = pSvrSockData->nMaxReconTimes;
-    }
-    else
-    {
-        nMaxReconTimes = 7;
-    }
+        int nReconTimes = 1;  //重连次数
+        int nMaxReconTimes = 0;  //最大重连次数
+        if(pSvrSockData->nMaxReconTimes > 0 && pSvrSockData->nMaxReconTimes <= 7)
+        {
+            nMaxReconTimes = pSvrSockData->nMaxReconTimes;
+        }
+        else
+        {
+            nMaxReconTimes = 7;
+        }
 
-    do
-    {
-        nRet = netframe_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->nPort, nTimeOut); //创建连接
-        nTimeOut *= 2;
+        do
+        {
+            nRet = netframe_tcp_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->nPort, nTimeOut); //创建连接
+            nTimeOut *= 2;
+        }
+        while(nRet != CNV_ERR_OK && nReconTimes++ < nMaxReconTimes);
     }
-    while(nRet != CNV_ERR_OK && nReconTimes++ < nMaxReconTimes);
+    else if(strcmp(pSvrSockData->strProtocol, "UNIXSOCKET") == 0)  //unixsocket协议
+    {
+        nRet = netframe_unixsocket_connect(&nSocket, pSvrSockData->strUnixDomainPath);
+    }
 
     if(nRet != CNV_ERR_OK)
     {
         return -1;
     }
 
-    if(pSvrSockData->isRecvSvrData == K_TRUE)  //需要接收服务端数据
+    if(pSvrSockData->isRecvSvrData == 1)  //需要接收服务端数据
     {
         nRet = hash_add_conidfd(nSocket, pSvrSockData, pIoThreadContext);  //客户端hashmap
         if(nRet != CNV_ERR_OK)
@@ -514,7 +521,7 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
         return -1;
     }
 
-    if(pSvrSockData->isReqLogin)        //是否发送登录验证
+    if(pSvrSockData->isReqLogin == 1)     //是否发送登录验证
     {
         nRet = netframe_req_login(nSocket, pSvrSockData);
         if(nRet != CNV_ERR_OK)
@@ -557,7 +564,7 @@ int  netframe_heart_beat(int timerfd_hearbeat, IO_THREAD_CONTEXT *pIoThreadConte
 
             void *pOutValue = NULL;
             int nRet = cnv_hashmap_get(pIoThreadContext->HashAddrFd, strKey, &pOutValue);
-            if(nRet == K_SUCCEED && pSvrSockData->pHeartBeat != NULL && pSvrSockData->nHeartBeatLen > 0)   //能找的到而且心跳包数据存在
+            if(nRet == K_SUCCEED && pSvrSockData->pHeartBeat != NULL && pSvrSockData->nHeartBeatLen > 0)   //能找得到连接而且心跳包数据不为空
             {
                 SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
                 nRet = netframe_write(pSocketElement->Socket, pSvrSockData->pHeartBeat, pSvrSockData->nHeartBeatLen, NULL);
@@ -565,11 +572,11 @@ int  netframe_heart_beat(int timerfd_hearbeat, IO_THREAD_CONTEXT *pIoThreadConte
                 {
                     netframe_reconnect_server(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData, pIoThreadContext);
                 }
-                queuenode = get_unblock_queue_next(queuenode);
-                continue;
             }
-
-            netframe_long_connect_(pIoThreadContext, pSvrSockData);
+            else  //没有连接信息了,直接重连
+            {
+                netframe_long_connect_(pIoThreadContext, pSvrSockData);
+            }
 
             queuenode = get_unblock_queue_next(queuenode);
         }
@@ -716,6 +723,7 @@ int  hash_add_addrsocket(int Socket, SERVER_SOCKET_DATA *pSvrSockData, void *Has
         return  CNV_ERR_MALLOC;
     }
     memset(pSocketElement, 0x00, sizeof(SOCKET_ELEMENT));
+    pSocketElement->pConnId = pKey;
     pSocketElement->Socket = Socket;
     pSocketElement->Time = cnv_comm_get_utctime();
     SERVER_SOCKET_ELEMENT *pSvrSockElement = &(pSocketElement->uSockElement.tSvrSockElement);
@@ -743,7 +751,7 @@ int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CON
     int nRet = CNV_ERR_OK;
     void *pOldValue = NULL;
 
-    SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)cnv_comm_Malloc(sizeof(SOCKET_ELEMENT));
+    SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)malloc(sizeof(SOCKET_ELEMENT));
     if(!pSocketElement)
     {
         return CNV_ERR_MALLOC;
@@ -759,11 +767,8 @@ int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CON
     pSocketElement->uSockElement.tClnSockElement.msg.msg_iovlen = 1;
     pSocketElement->uSockElement.tClnSockElement.msg.msg_control = pSocketElement->uSockElement.tClnSockElement.strControl;
     pSocketElement->uSockElement.tClnSockElement.msg.msg_controllen = sizeof(pSocketElement->uSockElement.tClnSockElement.strControl);
-    snprintf(pSvrSockData->tCallback.strProtocol, sizeof(pSvrSockData->tCallback.strProtocol) - 1, "parse_server");
     set_callback_function(SERVER_CALLBACK_FUNC, &(pSvrSockData->tCallback));
     snprintf(pSocketElement->uSockElement.tClnSockElement.strServiceName, sizeof(pSocketElement->uSockElement.tClnSockElement.strServiceName) - 1, "%s", pSvrSockData->strServiceName);
-    snprintf(pSocketElement->uSockElement.tClnSockElement.tSvrSockData.strServerIp, sizeof(pSocketElement->uSockElement.tClnSockElement.tSvrSockData.strServerIp) - 1, "%s", pSvrSockData->strServerIp);
-    pSocketElement->uSockElement.tClnSockElement.tSvrSockData.nPort = pSvrSockData->nPort;
     pSocketElement->uSockElement.tClnSockElement.pfncnv_parse_protocol = pSvrSockData->tCallback.pfncnv_parse_protocol;
     pSocketElement->uSockElement.tClnSockElement.pfncnv_handle_business = pSvrSockData->tCallback.pfncnv_handle_business;
 
@@ -777,7 +782,7 @@ int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CON
     }
 
     int ConnId = netframe_get_hashkey(pIoThreadContext->HashConnidFd, &(pIoThreadContext->SeedOfKey));
-    char *pKey = (char *)cnv_comm_Malloc(64);
+    char *pKey = (char *)malloc(64);
     if(!pKey)
     {
         cnv_comm_Free(pSocketElement);
@@ -788,7 +793,7 @@ int hash_add_conidfd(int Socket, SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CON
     pSocketElement->pConnId = pKey;
     LOG_SYS_DEBUG("ConnId = %d, Socket :%d", ConnId, Socket);
 
-    HASHMAP_VALUE  *pHashValue = (HASHMAP_VALUE *)cnv_comm_Malloc(sizeof(HASHMAP_VALUE));
+    HASHMAP_VALUE  *pHashValue = (HASHMAP_VALUE *)malloc(sizeof(HASHMAP_VALUE));
     if(!pHashValue)
     {
         cnv_comm_Free(pSocketElement);
@@ -882,15 +887,9 @@ void  remove_client_socket_hashmap(int Epollfd, void *HashConnidFd, void *pKey)
     netframe_delete_event(Epollfd, pSocketElement->Socket);
     netframe_close_socket(pSocketElement->Socket);
     cnv_comm_Free(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer);
-    if(pSocketElement->uSockElement.tClnSockElement.pWriteRemain)
-    {
-        cnv_comm_Free(pSocketElement->uSockElement.tClnSockElement.pWriteRemain);
-        pSocketElement->uSockElement.tClnSockElement.pWriteRemain = NULL;
-    }
-    cnv_comm_Free(pSocketElement->pConnId);
-    pSocketElement->pConnId = NULL;
+    cnv_comm_Free(pSocketElement->pConnId);  //hashkey
     cnv_comm_Free(pSocketElement);
-    cnv_comm_Free(pOutValue);
+    cnv_comm_Free(pOutValue);  //hashvalue
 }
 
 void  remove_server_socket_hashmap(int Epollfd, void *HashAddrFd, void *pKey)
@@ -903,11 +902,14 @@ void  remove_server_socket_hashmap(int Epollfd, void *HashAddrFd, void *pKey)
     SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
 
     cnv_hashmap_remove(HashAddrFd, pKey, NULL);
-    netframe_delete_event(Epollfd, pSocketElement->Socket);
     netframe_close_socket(pSocketElement->Socket);
-    cnv_comm_Free(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain);
+    if(strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strProtocol, "UNIXSOCKET") == 0)
+    {
+        unlink(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strUnixDomainPath);
+    }
+    cnv_comm_Free(pSocketElement->pConnId);   //hashkey
     cnv_comm_Free(pSocketElement);
-    cnv_comm_Free(pOutValue);
+    cnv_comm_Free(pOutValue);  //hash value
 }
 
 void  cnv_hashmap_free_socket(void *Hashmap, void *Epollfd)
@@ -920,21 +922,13 @@ K_BOOL earase_client_socket_hashmap(void  *pKey, void  *pValue, void  *pContext,
 {
     int  Epollfd = *(int *)pContext;
 
-    cnv_comm_Free(pKey);
-    if(pValue)
-    {
-        SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pValue)->pValue);
-        CLIENT_SOCKET_DATA *pClnSockData = &(pSocketElement->uSockElement.tClnSockElement.SocketData);
-        netframe_delete_event(Epollfd, pSocketElement->Socket);
-        netframe_close_socket(pSocketElement->Socket);
-        cnv_comm_Free(pClnSockData->pDataBuffer);
-        if(pSocketElement->uSockElement.tClnSockElement.pWriteRemain)
-        {
-            cnv_comm_Free(pSocketElement->uSockElement.tClnSockElement.pWriteRemain);
-        }
-        cnv_comm_Free(((HASHMAP_VALUE *)pValue)->pValue);
-        cnv_comm_Free(pValue);
-    }
+    cnv_comm_Free(pKey);   //hashkey
+    SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pValue)->pValue);
+    netframe_delete_event(Epollfd, pSocketElement->Socket);
+    netframe_close_socket(pSocketElement->Socket);
+    cnv_comm_Free(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer);
+    cnv_comm_Free(pSocketElement);
+    cnv_comm_Free(pValue);  //hash value
 
     *bIsEarase = true;
     return  true;
@@ -942,17 +936,12 @@ K_BOOL earase_client_socket_hashmap(void  *pKey, void  *pValue, void  *pContext,
 
 K_BOOL earase_server_socket_hashmap(void *pKey, void *pValue, void *pContext, K_BOOL *bIsEarase)
 {
-    int  Epollfd = *(int *)pContext;
-
     cnv_comm_Free(pKey);
-    if(pValue)
-    {
-        SOCKET_ELEMENT  *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pValue)->pValue);
-        netframe_delete_event(Epollfd, pSocketElement->Socket);
-        netframe_close_socket(pSocketElement->Socket);
-        cnv_comm_Free(pSocketElement);
-        cnv_comm_Free(pValue);
-    }
+    SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pValue)->pValue);
+    netframe_close_socket(pSocketElement->Socket);
+    cnv_comm_Free(pSocketElement);
+    cnv_comm_Free(pValue);
+
     *bIsEarase = true;
     return  true;
 }

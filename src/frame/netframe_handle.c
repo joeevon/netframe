@@ -62,6 +62,12 @@ void handlethread_handle_iomsg(int  EventfdIo, void *pBusinessParams, HANDLE_THR
     IO_TO_HANDLE_DATA *pIOHanldeData = (IO_TO_HANDLE_DATA *)lockfree_queue_dequeue(&pHandleContext->io_handle_msgque, 1);
     if(pIOHanldeData == NULL)
     {
+        uint64_t  ulData = 0;
+        int32_t nRet = read(EventfdIo, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
+        if(nRet != sizeof(uint64_t))
+        {
+            LOG_SYS_FATAL("handle read eventfd failed,%s.", strerror(errno));
+        }
         return;
     }
 
@@ -99,12 +105,6 @@ void handlethread_handle_iomsg(int  EventfdIo, void *pBusinessParams, HANDLE_THR
 
     free(pIOHanldeData->pDataSend);
     free(pIOHanldeData);
-
-    if(lockfree_queue_len(&pHandleContext->io_handle_msgque) <= 0)
-    {
-        uint64_t ulData = 0;
-        nRet = read(EventfdIo, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
-    }
 }
 
 int netframe_init_handle(HANDLE_THREAD_ITEM *pTheadparam)
@@ -271,19 +271,19 @@ int  handle_thread_run(void *pThreadParameter)
                 }
                 else if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))   //错误
                 {
-                    LOG_SYS_ERROR("%s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                 }
                 else if(szEpollEvent[i].events & POLLNVAL)
                 {
-                    LOG_SYS_ERROR("%s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                 }
                 else if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
                 {
-                    LOG_SYS_ERROR("%s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                 }
                 else
                 {
-                    LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
+                    LOG_SYS_ERROR("unrecognized abnormal, %s.", strerror(errno));
                 }
             }
 
@@ -291,7 +291,7 @@ int  handle_thread_run(void *pThreadParameter)
         }
         else if(nCount < 0)
         {
-            LOG_SYS_ERROR("%s", strerror(errno));
+            LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
         }
     }
 

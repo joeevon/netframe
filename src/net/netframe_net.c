@@ -154,7 +154,7 @@ int netframe_init_unixsocket(int *pSocket, struct sockaddr_un *pSockAddr)
     return CNV_ERR_OK;
 }
 
-int netframe_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int nTimeOut)
+int netframe_tcp_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int nTimeOut)
 {
     int Sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_TCP);
     if(Sockfd == -1)
@@ -227,6 +227,31 @@ int netframe_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int nTime
 
     *pSocket = Sockfd;
     LOG_SYS_INFO("connect %s %d success.", pAddrIP, ulPort);
+    return 0;
+}
+
+int netframe_unixsocket_connect(int *pSocket, char *strUnixdomain)
+{
+    int  nSocket = socket(AF_UNIX, SOCK_STREAM, 0);
+    if(nSocket < 0)
+    {
+        LOG_SYS_ERROR("create unixsocket failed,%s.", strerror(errno));
+        return -1;
+    }
+
+    struct sockaddr_un srv_addr = { 0 };
+    srv_addr.sun_family = AF_UNIX;
+    memcpy(srv_addr.sun_path, strUnixdomain, sizeof(srv_addr.sun_path) - 1);
+
+    int nRet = connect(nSocket, (struct sockaddr *)&srv_addr, sizeof(struct sockaddr_un));
+    if(nRet != 0)
+    {
+        LOG_SYS_ERROR("connect unixsockket failed,%s,%s.", strUnixdomain, strerror(errno));
+        return -1;
+    }
+
+    LOG_SYS_INFO("connect to %s succcess.", strUnixdomain);
+    *pSocket = nSocket;
     return 0;
 }
 

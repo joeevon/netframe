@@ -157,6 +157,7 @@ extern "C"
     typedef struct  __CALLBACK_STRUCT_T
     {
         char strProtocol[DEFAULT_ARRAY_SIZE];
+        char strServiceName[DEFAULT_ARRAY_SIZE];  //服务名字,供找同类服务器使用
         pfnCNV_PARSE_PROTOCOL pfncnv_parse_protocol;
         pfnCNV_HANDLE_BUSINESS pfncnv_handle_business;
         pfnCNV_MONITOR_CALLBACK pfncnv_monitor_callback;
@@ -165,12 +166,14 @@ extern "C"
 
     typedef  struct  __SERVER_SOCKET_DATA
     {
-        K_BOOL isReqLogin;   //是否发送登录请求
-        K_BOOL isRecvSvrData;  //服务端向客户端推送数据
+        int  isReqLogin;   //是否发送登录请求
+        int  isRecvSvrData;  //服务端向客户端推送数据
         int nMaxReconTimes;  //最大重连次数  0 ~ 7
         int nTimeOut;  //连接超时时长,microsecond  0 ~ 70000
         int  nPort;   //端口
         int  nHeartBeatLen;   //心跳包长度
+        char strProtocol[16];   //协议 tcp/unixsocket,默认tcp
+        char strUnixDomainPath[128];   //unixsocket domain路径
         char *pHeartBeat;    //心跳包数据
         char strServerIp[DEFAULT_ARRAY_SIZE];   //服务器IP
         char strServiceName[DEFAULT_ARRAY_SIZE];  //服务名字,供找同类服务器使用
@@ -185,12 +188,10 @@ extern "C"
         int lConnectID;    //短连接ID
         char strServIp[DEFAULT_ARRAY_SIZE];   //服务器IP
         unsigned int ulPort;         //服务器端口
-        int lNumOfItem;    //个数
         char *pDataSend;   // 解析后可发送的数据
         int handle_io_eventfd;  //handle唤醒io
         int io_thread_index;  //IO线程ID
         CNV_BLOCKING_QUEUE *handle_io_msgque;  // handle写io消息队列
-        int lSourceCode;    //来源
         pfnCNV_HANDLE_BUSINESS pfncnv_handle_business;  //业务处理回调函数
         pfnSEND_FAILED_CALLBACK pfnsend_failed_callback;  //发送失败对调函数
         int nReserveOne;   //保留变量
@@ -257,27 +258,6 @@ extern "C"
         CNV_UNBLOCKING_QUEUE queParamFrameUse;   //框架handle使用的
         void *pBusinessParams;    //业务使用的
     } HANDLE_PARAMS;
-
-    //BALANCE  ITEM
-    typedef  struct  __NAVI_HOST_ITEM
-    {
-        char   strServIp[DEFAULT_ARRAY_SIZE];      //服务IP
-        unsigned int    ulPort;                 //端口
-    } HOST_ITEM;
-
-    //server respond client
-    typedef struct __SERVER_RESPOND_CLIENT
-    {
-        int lDataLen;   //数据长度
-        char *pDataSend;    //数据
-    } SERVER_RESPOND_CLIENT;
-
-    //server respond client
-    typedef struct __PARSE_FUNC_AUXILIARY
-    {
-        int nDistributeValue;   //哈希值
-        char *pAuxiliaryReserve;    //辅助保留数据
-    } PARSE_FUNC_AUXILIARY;
 
 #ifdef __cplusplus
 };

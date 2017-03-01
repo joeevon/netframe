@@ -1,5 +1,5 @@
 /****************************
-    FileName:netframe_io.cgethash client of server failed
+    FileName:netframe_io.c
     (C) Copyright 2014 by Careland
     凯立德秘密信息
     Description:
@@ -141,43 +141,8 @@ void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
 int iothread_handle_write(int Epollfd, void *pConnId, void *HashConnidFd, IO_THREAD_CONTEXT *pIoThreadContext)
 {
     LOG_SYS_DEBUG("iothread_handle_write.");
-    void *pOutValue = NULL;
-    int nRet = cnv_hashmap_get(HashConnidFd, pConnId, &pOutValue);  // 用connid获取socket相关结构体
-    if(nRet != K_SUCCEED)
-    {
-        LOG_SYS_ERROR("hashmap can not get value!");
-        return nRet;
-    }
-    SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
-    CLIENT_SOCKET_ELEMENT *ptClnSockElement = &pSocketElement->uSockElement.tClnSockElement;
-
-    int nLenAlreadyWrite = 0;
-    nRet = netframe_write(pSocketElement->Socket, ptClnSockElement->pWriteRemain, ptClnSockElement->lWriteRemain, &nLenAlreadyWrite);
-    if(nRet == CNV_ERR_OK)  //写完,删除临时缓存,并修改为读事件
-    {
-        ptClnSockElement->lWriteRemain = 0;
-        cnv_comm_Free(ptClnSockElement->pWriteRemain);
-        ptClnSockElement->pWriteRemain = NULL;
-        netframe_modify_writeevent(Epollfd, pSocketElement->Socket, pConnId);
-    }
-    else
-    {
-        if(nRet == AGENT_NET_WRITE_INCOMPLETED)   //没写完,继续写
-        {
-            memmove(ptClnSockElement->pWriteRemain, ptClnSockElement->pWriteRemain + nLenAlreadyWrite, ptClnSockElement->lWriteRemain - nLenAlreadyWrite);
-            ptClnSockElement->lWriteRemain -= nLenAlreadyWrite;
-        }
-        else   //放弃写,修改为读事件
-        {
-            ptClnSockElement->lWriteRemain = 0;
-            cnv_comm_Free(ptClnSockElement->pWriteRemain);
-            ptClnSockElement->pWriteRemain = NULL;
-            netframe_modify_writeevent(Epollfd, pSocketElement->Socket, pConnId);
-        }
-    }
-
     LOG_SYS_DEBUG("iothread_handle_write end.");
-    return  nRet;
+    return  0;
 }
 
 //获取连接句柄
@@ -283,69 +248,32 @@ int on_write_client_failed(HANDLE_TO_IO_DATA *pHandleIOData, IO_THREAD_CONTEXT  
     return CNV_ERR_OK;
 }
 
-int save_client_remain_data(int Epollfd, SOCKET_ELEMENT *pSocketElement, HANDLE_TO_IO_DATA *ptHandleIOData, int nLenAlreadyWrite)
+int32_t write_client_remain_data(IO_THREAD_CONTEXT *pIoThreadContext, SOCKET_ELEMENT *pSocketElement, HANDLE_TO_IO_DATA *pHandleIOData, int32_t nLenAlreadyWrite)
 {
-    CLIENT_SOCKET_ELEMENT *ptClnSockElement = &pSocketElement->uSockElement.tClnSockElement;
+    int32_t nWriteAlready = 0;
 
-    if(nLenAlreadyWrite >= ptClnSockElement->lWriteRemain)  //只剩下新的数据
+    int32_t nRet = netframe_write(pSocketElement->Socket, pHandleIOData->pDataSend + nLenAlreadyWrite, pHandleIOData->lDataLen - nLenAlreadyWrite, &nWriteAlready);
+    if(nRet == CNV_ERR_OK)
     {
-        int nTmpRemain = ptClnSockElement->lWriteRemain;
-        ptClnSockElement->lWriteRemain = ptClnSockElement->lWriteRemain + ptHandleIOData->lDataLen - nLenAlreadyWrite;
-        if(ptClnSockElement->pWriteRemain != NULL)
-        {
-            cnv_comm_Free(ptClnSockElement->pWriteRemain);
-            ptClnSockElement->pWriteRemain = NULL;
-        }
-        ptClnSockElement->pWriteRemain = (char *)malloc(ptClnSockElement->lWriteRemain);
-        assert(ptClnSockElement->pWriteRemain);
-        memcpy(ptClnSockElement->pWriteRemain, ptHandleIOData->pDataSend + (nLenAlreadyWrite - nTmpRemain), ptClnSockElement->lWriteRemain);
+        pSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
+        LOG_SYS_DEBUG("write %d bytes success.", nWriteAlready);
     }
-    else  //之前剩下的数据没写完
+    else
     {
-        int nReRemain = ptClnSockElement->lWriteRemain - nLenAlreadyWrite;
-        char *pReRemain = (char *)malloc(nReRemain);
-        assert(pReRemain);
-        memcpy(pReRemain, ptClnSockElement->pWriteRemain + nLenAlreadyWrite, nReRemain);
-
-        ptClnSockElement->lWriteRemain = ptClnSockElement->lWriteRemain + ptHandleIOData->lDataLen - nLenAlreadyWrite;
-        if(ptClnSockElement->pWriteRemain != NULL)
+        if(nRet == AGENT_NET_WRITE_INCOMPLETED)      //继续写未写完的数据
         {
-            cnv_comm_Free(ptClnSockElement->pWriteRemain);
-            ptClnSockElement->pWriteRemain = NULL;
+            pSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
+            return write_client_remain_data(pIoThreadContext, pSocketElement, pHandleIOData, nLenAlreadyWrite + nWriteAlready);
         }
-        memcpy(ptClnSockElement->pWriteRemain, pReRemain, nReRemain);
-        memcpy(ptClnSockElement->pWriteRemain + nReRemain, ptHandleIOData->pDataSend, ptHandleIOData->lDataLen);
-        cnv_comm_Free(pReRemain);
+        else  //发送错误,因为是上一个遗留的数据,直接丢弃,避免造成乱包
+        {
+            LOG_SYS_ERROR("write remain data failed!");
+            on_write_client_failed(pHandleIOData, pIoThreadContext);
+            return -1;
+        }
     }
 
     return CNV_ERR_OK;
-}
-
-int sendmsg_to_client(SOCKET_ELEMENT *pSocketElement, HANDLE_TO_IO_DATA *pHandleIOData, int *pnLenAlreadyWrite)
-{
-    if(pSocketElement->uSockElement.tClnSockElement.lWriteRemain == 0)
-    {
-        struct iovec tIovecWriteData = { 0 };
-        tIovecWriteData.iov_base = pHandleIOData->pDataSend;
-        tIovecWriteData.iov_len = pHandleIOData->lDataLen;
-        pSocketElement->uSockElement.tClnSockElement.msg.msg_iov = &tIovecWriteData;
-        pSocketElement->uSockElement.tClnSockElement.msg.msg_iovlen = 1;
-    }
-    else if(pSocketElement->uSockElement.tClnSockElement.lWriteRemain > 0)
-    {
-        struct iovec szIovecWriteData[2];
-        bzero(szIovecWriteData, sizeof(struct iovec) * 2);
-        szIovecWriteData[0].iov_base = pSocketElement->uSockElement.tClnSockElement.pWriteRemain;
-        szIovecWriteData[0].iov_len = pSocketElement->uSockElement.tClnSockElement.lWriteRemain;
-        szIovecWriteData[1].iov_base = pHandleIOData->pDataSend;
-        szIovecWriteData[1].iov_len = pHandleIOData->lDataLen;
-        pSocketElement->uSockElement.tClnSockElement.msg.msg_iov = szIovecWriteData;
-        pSocketElement->uSockElement.tClnSockElement.msg.msg_iovlen = 2;
-    }
-
-    int nDataLen = pSocketElement->uSockElement.tClnSockElement.lWriteRemain + pHandleIOData->lDataLen;
-    LOG_SYS_DEBUG("size to write:%d", nDataLen);
-    return netframe_sendmsg(pSocketElement->Socket, &pSocketElement->uSockElement.tClnSockElement.msg, nDataLen, pnLenAlreadyWrite);
 }
 
 int respond_write_client(int Epollfd, char *pOutValue, HANDLE_TO_IO_DATA *pHandleIOData, void *HashConnidFd, IO_THREAD_CONTEXT  *pIoThreadContext)
@@ -356,22 +284,20 @@ int respond_write_client(int Epollfd, char *pOutValue, HANDLE_TO_IO_DATA *pHandl
     pSocketElement->uSockElement.tClnSockElement.nReserverTwo = pHandleIOData->nReserverTwo;
     int nLenAlreadyWrite = 0;
 
-    int nRet = sendmsg_to_client(pSocketElement, pHandleIOData, &nLenAlreadyWrite);
+    int nRet = netframe_write(pSocketElement->Socket, pHandleIOData->pDataSend, pHandleIOData->lDataLen, &nLenAlreadyWrite);
     if(nRet == CNV_ERR_OK)
     {
-        pSocketElement->uSockElement.tClnSockElement.lWriteRemain = 0;
         pSocketElement->Time = cnv_comm_get_utctime();
-        LOG_SYS_DEBUG("write %d bytes successfully", pSocketElement->uSockElement.tSvrSockElement.lWriteRemain + pHandleIOData->lDataLen);
     }
     else
     {
-        if(nRet == AGENT_NET_WRITE_BUSY || nRet == AGENT_NET_WRITE_INCOMPLETED)   //保存未写完数据,修改epoll事件
+        if(nRet == AGENT_NET_WRITE_BUSY || nRet == AGENT_NET_WRITE_INCOMPLETED)   //没写完,继续写
         {
             LOG_SYS_ERROR("write imcompleted!");
             pSocketElement->Time = cnv_comm_get_utctime();
-            return save_client_remain_data(Epollfd, pSocketElement, pHandleIOData, nLenAlreadyWrite);
+            return write_client_remain_data(pIoThreadContext, pSocketElement, pHandleIOData, nLenAlreadyWrite);
         }
-        else if(nRet == AGENT_NET_CONNECTION_RESET || nRet == AGENT_NET_NOT_CONNECTED)   //连接异常,从hashmp删掉并找下一台服务器
+        else if(nRet == AGENT_NET_CONNECTION_RESET || nRet == AGENT_NET_NOT_CONNECTED)   //连接异常
         {
             LOG_SYS_ERROR("connection abnormal!");
 
@@ -485,7 +411,6 @@ int write_server_remain_data(IO_THREAD_CONTEXT *pIoThreadContext, SOCKET_ELEMENT
     int nRet = netframe_write(pSocketElement->Socket, pHandleIOData->pDataSend + nLenAlreadyWrite, pHandleIOData->lDataLen - nLenAlreadyWrite, &nWriteAlready);
     if(nRet == CNV_ERR_OK)
     {
-        pSocketElement->uSockElement.tSvrSockElement.lWriteRemain = 0;
         pSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
         LOG_SYS_DEBUG("write %d bytes successfully", pHandleIOData->lDataLen - nLenAlreadyWrite);
     }
@@ -529,7 +454,6 @@ int respond_write_next_server(SERVER_SOCKET_DATA *pSvrSockData, HANDLE_TO_IO_DAT
                     nRet = netframe_write(pSocketElement->Socket, pHandleIOData->pDataSend, pHandleIOData->lDataLen, &nLenAlreadyWrite);
                     if(nRet == CNV_ERR_OK)
                     {
-                        pSocketElement->uSockElement.tSvrSockElement.lWriteRemain = 0;
                         pSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
                         LOG_SYS_INFO("write next server success");
                         return CNV_ERR_OK;
@@ -587,9 +511,8 @@ int respond_write_server_again(SERVER_SOCKET_DATA *pSvrSockData, HANDLE_TO_IO_DA
     nRet = netframe_write(ptSocketElement->Socket, pHandleIOData->pDataSend, pHandleIOData->lDataLen, &nLenAlreadyWrite);
     if(nRet == CNV_ERR_OK)
     {
-        ptSocketElement->uSockElement.tSvrSockElement.lWriteRemain = 0;
         ptSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
-        LOG_SYS_DEBUG("write %d bytes successfully", ptSocketElement->uSockElement.tSvrSockElement.lWriteRemain + pHandleIOData->lDataLen);
+        LOG_SYS_DEBUG("write %d bytes successfully", pHandleIOData->lDataLen);
     }
     else
     {
@@ -619,9 +542,8 @@ int respond_write_server(int Epollfd, char *pOutValue, HANDLE_TO_IO_DATA *pHandl
     int nRet = netframe_write(pSocketElement->Socket, pHandleIOData->pDataSend, pHandleIOData->lDataLen, &nLenAlreadyWrite);
     if(nRet == CNV_ERR_OK)
     {
-        pSocketElement->uSockElement.tSvrSockElement.lWriteRemain = 0;
         pSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
-        LOG_SYS_DEBUG("write %d bytes successfully", pSocketElement->uSockElement.tSvrSockElement.lWriteRemain + pHandleIOData->lDataLen);
+        LOG_SYS_DEBUG("write %d bytes successfully", pHandleIOData->lDataLen);
     }
     else
     {
@@ -811,7 +733,7 @@ int iothread_handle_respond(int Epollfd, int Eventfd, CNV_BLOCKING_QUEUE *handle
         nRet = read(Eventfd, &ulData, sizeof(uint64_t));   //此数无用,读出缓存消息,避免epoll重复提醒
         if(nRet != sizeof(uint64_t))
         {
-            LOG_SYS_FATAL("handle respond read eventfd failed !");
+            LOG_SYS_FATAL("io read eventfd failed,%s.", strerror(errno));
         }
     }
 
@@ -854,7 +776,7 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
             continue;
         }
 
-        SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)cnv_comm_Malloc(sizeof(SOCKET_ELEMENT));
+        SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)malloc(sizeof(SOCKET_ELEMENT));
         if(!pSocketElement)
         {
             continue;
@@ -893,13 +815,13 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
             }
         }
 
-        char *pKey = (char *)cnv_comm_Malloc(33);
+        char *pKey = (char *)malloc(33);
         if(!pKey)
         {
             cnv_comm_Free(pSocketElement);
             continue;
         }
-        bzero(pKey, 33);
+        memset(pKey, 0, 33);
 
         if(AcceptIOData.uMapType == 0)   //用连接ID做映射
         {
@@ -921,7 +843,7 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
             continue;
         }
 
-        HASHMAP_VALUE  *pHashValue = (HASHMAP_VALUE *)cnv_comm_Malloc(sizeof(HASHMAP_VALUE));
+        HASHMAP_VALUE  *pHashValue = (HASHMAP_VALUE *)malloc(sizeof(HASHMAP_VALUE));
         if(!pHashValue)
         {
             cnv_comm_Free(pSocketElement);
@@ -1312,16 +1234,16 @@ int  io_thread_run(void *pThreadParameter)
                 }
                 else if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))  //错误
                 {
-                    LOG_SYS_ERROR("%s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                     remove_client_socket_hashmap(Epollfd, HashConnidFd, szEpollEvent[i].data.ptr);
                 }
                 else if(szEpollEvent[i].events & POLLNVAL)
                 {
-                    LOG_SYS_ERROR("%s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                 }
                 else if(szEpollEvent[i].events & (EPOLLERR | POLLNVAL))
                 {
-                    LOG_SYS_ERROR("%s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                     remove_client_socket_hashmap(Epollfd, HashConnidFd, szEpollEvent[i].data.ptr);
                 }
                 else if(szEpollEvent[i].events & EPOLLOUT)  //写事件
@@ -1330,7 +1252,7 @@ int  io_thread_run(void *pThreadParameter)
                 }
                 else
                 {
-                    LOG_SYS_ERROR("unrecognized error, %s", strerror(errno));
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                     remove_client_socket_hashmap(Epollfd, HashConnidFd, szEpollEvent[i].data.ptr);
                 }
             }
@@ -1339,7 +1261,7 @@ int  io_thread_run(void *pThreadParameter)
         }
         else if(nCount < 0)   //错误
         {
-            LOG_SYS_ERROR("%s", strerror(errno));
+            LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
         }
     }
 
@@ -1349,7 +1271,7 @@ int  io_thread_run(void *pThreadParameter)
 //功能:io线程反初始化
 void  io_thread_uninit(IO_THREAD_CONTEXT *pIoThreadContexts)
 {
-    free_server_unblock_queue(pIoThreadContexts[0].queServer);  //服务的配置队列,框架公用,释放一次即可
+    free_server_unblock_queue(pIoThreadContexts[0].queServer);  //服务的配置队列,所有IO线程公用,释放一次即可
     cnv_comm_Free(pIoThreadContexts[0].queServer);
     pIoThreadContexts[0].queServer = NULL;
     for(int i = 0; i < g_params.tConfigIO.lNumberOfThread; i++)
