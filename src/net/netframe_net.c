@@ -302,7 +302,7 @@ int netframe_add_event(int Epollfd, int Socket, unsigned int ulEventType, char *
     struct epoll_event tEpollEvent = { 0 };
     tEpollEvent.events = ulEventType;
 
-    if(pConnId)
+    if(pConnId) //epoll_event.data是union类型,只能设置一个值
     {
         tEpollEvent.data.ptr = (void *)pConnId;
     }

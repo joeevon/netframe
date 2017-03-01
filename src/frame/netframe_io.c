@@ -903,21 +903,19 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
     memset(pmsg->msg_iov->iov_base, 0, pmsg->msg_iov->iov_len);
 
     int nDataReadLen = 0;
-    int nRet = netframe_recvmsg(nSocket, pmsg, &nDataReadLen);  //接收数据
+    int nRet = netframe_recvmsg(pSocketElement->Socket, pmsg, &nDataReadLen);  //接收数据
     if(nRet != CNV_ERR_OK)
     {
         if(nRet == AGENT_NET_CLIENT_CLOSED)   //客户端关闭
         {
-            LOG_SYS_DEBUG("threadid:%d,client closed.", pIoThreadContext->threadindex);
             remove_client_socket_hashmap(Epollfd, HashConnidFd, pConnId);
         }
         else if(nRet == AGENT_NET_READ_BUSY)  //系统繁忙
         {
             LOG_SYS_DEBUG("threadid:%d, read nothing.", pIoThreadContext->threadindex);
         }
-        else if(nRet == AGENT_NET_ERR_READ)    //读取错误
+        else if(nRet == AGENT_NET_READ_ABNORMAL)    //读取错误
         {
-            LOG_SYS_FATAL("threadid:%d, read failed!", pIoThreadContext->threadindex);
             remove_client_socket_hashmap(Epollfd, HashConnidFd, pConnId);
         }
 
