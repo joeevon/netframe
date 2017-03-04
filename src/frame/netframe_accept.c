@@ -506,11 +506,7 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
                     }
                     else    //客户端连接
                     {
-                        nRet = accept_client_connect(szEpollEvent[i].data.fd, pAcceptContext, queEventfds);
-                        if(nRet != 0)
-                        {
-                            continue;
-                        }
+                        accept_client_connect(szEpollEvent[i].data.fd, pAcceptContext, queEventfds);
                     }
                 }
                 else if((szEpollEvent[i].events & EPOLLHUP) && !(szEpollEvent[i].events & EPOLLIN))
@@ -531,7 +527,7 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
                 }
             }
 
-            bzero(szEpollEvent, sizeof(struct epoll_event)*nCount);
+            memset(szEpollEvent, 0, sizeof(struct epoll_event)*nCount);
         }
         else if(nCount < 0)
         {

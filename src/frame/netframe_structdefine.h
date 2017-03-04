@@ -211,7 +211,7 @@ extern "C"
 
     typedef  struct  __CLIENT_SOCKET_DATA
     {
-        int  lDataRemain;       //剩下的数据长度(不完整的包)
+        unsigned int  lDataRemain;       //剩下的数据长度(不完整的包)
         char  *pDataBuffer;       //数据缓冲
         char  *pMovePointer;   //移动遍历的指针
     } CLIENT_SOCKET_DATA;
