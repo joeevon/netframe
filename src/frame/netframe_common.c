@@ -465,13 +465,13 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
     if(strlen(pSvrSockData->strProtocol) == 0 || strcmp(pSvrSockData->strProtocol, "TCP") == 0)   //默认tcp协议
     {
         int nTimeOut = 0;  //microsecond
-        if(pSvrSockData->nTimeOut > 0 && pSvrSockData->nTimeOut <= 70000)
+        if(pSvrSockData->nTimeOut > 0 && pSvrSockData->nTimeOut <= 50000)
         {
             nTimeOut = pSvrSockData->nTimeOut;
         }
         else
         {
-            nTimeOut = 70000;
+            nTimeOut = 50000;
         }
 
         int nReconTimes = 1;  //重连次数
@@ -482,13 +482,13 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
         }
         else
         {
-            nMaxReconTimes = 7;
+            nMaxReconTimes = 5;
         }
 
         do
         {
             nRet = netframe_tcp_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->nPort, nTimeOut); //创建连接
-            nTimeOut *= 2;
+            //nTimeOut *= 2;
         }
         while(nRet != CNV_ERR_OK && nReconTimes++ < nMaxReconTimes);
     }
