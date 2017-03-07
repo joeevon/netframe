@@ -459,7 +459,7 @@ K_BOOL hashmap_earase_callback(void  *pKey, void  *pValue, void  *pContext, K_BO
 
 int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DATA *pSvrSockData)
 {
-    if(pSvrSockData->nReconTimes == 0)  //连接次数为0时,重置上一次连接时间
+    if(pSvrSockData->nReconTimes == 0 || cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10)  //重置上一次连接时间
     {
         pSvrSockData->nLastConnectTime = cnv_comm_get_utctime();
     }
