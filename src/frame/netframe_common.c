@@ -459,8 +459,9 @@ K_BOOL hashmap_earase_callback(void  *pKey, void  *pValue, void  *pContext, K_BO
 
 int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DATA *pSvrSockData)
 {
-    if(pSvrSockData->nReconTimes == 0 || cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10)  //重置上一次连接时间
+    if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10 || pSvrSockData->nReconTimes == 0)
     {
+        pSvrSockData->nReconTimes == 0;
         pSvrSockData->nLastConnectTime = cnv_comm_get_utctime();
     }
 
@@ -528,12 +529,6 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
     }
     else
     {
-        if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10)  //超出10s,重置连接次数
-        {
-            pSvrSockData->nReconTimes = 0;
-            return netframe_long_connect_(pIoThreadContext, pSvrSockData);
-        }
-
         return -1;
     }
 
