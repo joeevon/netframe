@@ -837,7 +837,7 @@ int  netframe_long_connect(IO_THREAD_CONTEXT *pIoThreadContext, CNV_UNBLOCKING_Q
             //check
             if(pSvrSockData->nMaxReconTimes <= 0 || pSvrSockData->nMaxReconTimes > 10000)
             {
-                LOG_SYS_ERROR("MaxReconTimes is illegal,%d, set it default 30.", pSvrSockData->nMaxReconTimes);
+                LOG_SYS_ERROR("MaxReconTimes is illegal,%d, set it default 10.", pSvrSockData->nMaxReconTimes);
                 pSvrSockData->nMaxReconTimes = 10;
             }
 
