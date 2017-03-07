@@ -459,15 +459,17 @@ K_BOOL hashmap_earase_callback(void  *pKey, void  *pValue, void  *pContext, K_BO
 
 int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DATA *pSvrSockData)
 {
-    if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10 || pSvrSockData->nReconTimes == 0)
+    if(pSvrSockData->nMaxReconTimes > 0)
     {
-        pSvrSockData->nReconTimes == 0;
-        pSvrSockData->nLastConnectTime = cnv_comm_get_utctime();
+        if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10 || pSvrSockData->nReconTimes == 0)
+        {
+            pSvrSockData->nReconTimes = 0;
+            pSvrSockData->nLastConnectTime = cnv_comm_get_utctime();
+        }
     }
-
-    if(pSvrSockData->nMaxReconTimes <= 0 || pSvrSockData->nMaxReconTimes > 30)
+    else if(pSvrSockData->nMaxReconTimes == 0)
     {
-        pSvrSockData->nMaxReconTimes = 10;
+        pSvrSockData->nReconTimes = 0;
     }
 
     if(pSvrSockData->nReconTimes <= pSvrSockData->nMaxReconTimes)
@@ -838,6 +840,20 @@ int  netframe_long_connect(IO_THREAD_CONTEXT *pIoThreadContext, CNV_UNBLOCKING_Q
         while(queuenode)
         {
             SERVER_SOCKET_DATA *pSvrSockData = (SERVER_SOCKET_DATA *)queuenode->data_;
+
+            //check
+            if(pSvrSockData->nMaxReconTimes < 0 || pSvrSockData->nMaxReconTimes > 100)
+            {
+                LOG_SYS_ERROR("MaxReconTimes is illegal,%d.", pSvrSockData->nMaxReconTimes);
+                return -1;
+            }
+
+            if(strcmp(pSvrSockData->strProtocol, "UNIXSOCKET") == 0 && strlen(pSvrSockData->strUnixDomainPath) == 0)
+            {
+                LOG_SYS_ERROR("unix domain path is empty.");
+                return -1;
+            }
+
             netframe_long_connect_(pIoThreadContext, pSvrSockData);
             queuenode = get_unblock_queue_next(queuenode);
         }
