@@ -459,76 +459,76 @@ K_BOOL hashmap_earase_callback(void  *pKey, void  *pValue, void  *pContext, K_BO
 
 int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DATA *pSvrSockData)
 {
-    int nSocket = 0;
-    int nRet = -1;
-
-    if(strlen(pSvrSockData->strProtocol) == 0 || strcmp(pSvrSockData->strProtocol, "TCP") == 0)   //默认tcp协议
+    if(pSvrSockData->nReconTimes == 0)  //连接次数为0时,重置上一次连接时间
     {
-        int nTimeOut = 0;  //microsecond
-        if(pSvrSockData->nTimeOut > 0 && pSvrSockData->nTimeOut <= 50000)
-        {
-            nTimeOut = pSvrSockData->nTimeOut;
-        }
-        else
-        {
-            nTimeOut = 50000;
-        }
-
-        int nReconTimes = 1;  //重连次数
-        int nMaxReconTimes = 0;  //最大重连次数
-        if(pSvrSockData->nMaxReconTimes > 0 && pSvrSockData->nMaxReconTimes <= 7)
-        {
-            nMaxReconTimes = pSvrSockData->nMaxReconTimes;
-        }
-        else
-        {
-            nMaxReconTimes = 5;
-        }
-
-        do
-        {
-            nRet = netframe_tcp_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->nPort, nTimeOut); //创建连接
-            //nTimeOut *= 2;
-        }
-        while(nRet != CNV_ERR_OK && nReconTimes++ < nMaxReconTimes);
-    }
-    else if(strcmp(pSvrSockData->strProtocol, "UNIXSOCKET") == 0)  //unixsocket协议
-    {
-        nRet = netframe_unixsocket_connect(&nSocket, pSvrSockData->strUnixDomainPath);
+        pSvrSockData->nLastConnectTime = cnv_comm_get_utctime();
     }
 
-    if(nRet != CNV_ERR_OK)
+    if(pSvrSockData->nReconTimes <= pSvrSockData->nMaxReconTimes)
     {
-        return -1;
-    }
+        pSvrSockData->nReconTimes++;
+        int nSocket = 0;
+        int nRet = -1;
 
-    if(pSvrSockData->isRecvSvrData == 1)  //需要接收服务端数据
-    {
-        nRet = hash_add_conidfd(nSocket, pSvrSockData, pIoThreadContext);  //客户端hashmap
+        if(strlen(pSvrSockData->strProtocol) == 0 || strcmp(pSvrSockData->strProtocol, "TCP") == 0)    //默认tcp协议
+        {
+            int nTimeOut = 50000;
+            int nReconTimes = 1;  //重连次数
+
+            do
+            {
+                nRet = netframe_tcp_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->nPort, nTimeOut); //创建连接
+                nTimeOut *= 2;
+            }
+            while(nRet != CNV_ERR_OK && nReconTimes++ < 7);
+        }
+        else if(strcmp(pSvrSockData->strProtocol, "UNIXSOCKET") == 0)   //unixsocket协议
+        {
+            nRet = netframe_unixsocket_connect(&nSocket, pSvrSockData->strUnixDomainPath);
+        }
+
         if(nRet != CNV_ERR_OK)
         {
-            LOG_SYS_ERROR("hash_add_conidfd failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->nPort);
+            return -1;
+        }
+
+        if(pSvrSockData->isRecvSvrData == 1)   //需要接收服务端数据
+        {
+            nRet = hash_add_conidfd(nSocket, pSvrSockData, pIoThreadContext);  //客户端hashmap
+            if(nRet != CNV_ERR_OK)
+            {
+                LOG_SYS_ERROR("hash_add_conidfd failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->nPort);
+                netframe_close_socket(nSocket);
+                return -1;
+            }
+        }
+
+        nRet = hash_add_addrsocket(nSocket, pSvrSockData, pIoThreadContext->HashAddrFd); //服务端hashmap
+        if(nRet != CNV_ERR_OK)
+        {
+            LOG_SYS_ERROR("hash_add_addrsocket failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->nPort);
             netframe_close_socket(nSocket);
             return -1;
         }
-    }
 
-    nRet = hash_add_addrsocket(nSocket, pSvrSockData, pIoThreadContext->HashAddrFd); //服务端hashmap
-    if(nRet != CNV_ERR_OK)
-    {
-        LOG_SYS_ERROR("hash_add_addrsocket failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->nPort);
-        netframe_close_socket(nSocket);
-        return -1;
-    }
-
-    if(pSvrSockData->isReqLogin == 1)     //是否发送登录验证
-    {
-        nRet = netframe_req_login(nSocket, pSvrSockData);
-        if(nRet != CNV_ERR_OK)
+        if(pSvrSockData->isReqLogin == 1)      //是否发送登录验证
         {
-            LOG_SYS_ERROR("netframe_req_login failed!");
-            exit(-1);
+            nRet = netframe_req_login(nSocket, pSvrSockData);
+            if(nRet != CNV_ERR_OK)
+            {
+                LOG_SYS_ERROR("netframe_req_login failed!");
+                exit(-1);
+            }
         }
+    }
+    else
+    {
+        if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10)  //超出10s,重置连接次数
+        {
+            pSvrSockData->nReconTimes = 0;
+        }
+
+        return -1;
     }
 
     return CNV_ERR_OK;
@@ -564,13 +564,16 @@ int  netframe_heart_beat(int timerfd_hearbeat, IO_THREAD_CONTEXT *pIoThreadConte
 
             void *pOutValue = NULL;
             int nRet = cnv_hashmap_get(pIoThreadContext->HashAddrFd, strKey, &pOutValue);
-            if(nRet == K_SUCCEED && pSvrSockData->pHeartBeat != NULL && pSvrSockData->nHeartBeatLen > 0)   //能找得到连接而且心跳包数据不为空
+            if(nRet == K_SUCCEED)   //能找得到连接而且心跳包数据不为空
             {
-                SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
-                nRet = netframe_write(pSocketElement->Socket, pSvrSockData->pHeartBeat, pSvrSockData->nHeartBeatLen, NULL);
-                if(nRet == AGENT_NET_CONNECTION_ABNORMAL)
+                if(pSvrSockData->pHeartBeat != NULL && pSvrSockData->nHeartBeatLen > 0)
                 {
-                    netframe_reconnect_server(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData, pIoThreadContext);
+                    SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pOutValue)->pValue);
+                    nRet = netframe_write(pSocketElement->Socket, pSvrSockData->pHeartBeat, pSvrSockData->nHeartBeatLen, NULL);
+                    if(nRet == AGENT_NET_CONNECTION_ABNORMAL)
+                    {
+                        netframe_reconnect_server(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData, pIoThreadContext);
+                    }
                 }
             }
             else  //没有连接信息了,直接重连
@@ -903,10 +906,10 @@ void  remove_server_socket_hashmap(int Epollfd, void *HashAddrFd, void *pKey)
 
     cnv_hashmap_remove(HashAddrFd, pKey, NULL);
     netframe_close_socket(pSocketElement->Socket);
-    if(strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strProtocol, "UNIXSOCKET") == 0)
+    /*if(strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strProtocol, "UNIXSOCKET") == 0)
     {
         unlink(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strUnixDomainPath);
-    }
+    }*/
     cnv_comm_Free(pSocketElement->pConnId);   //hashkey
     cnv_comm_Free(pSocketElement);
     cnv_comm_Free(pOutValue);  //hash value
@@ -939,6 +942,10 @@ K_BOOL earase_server_socket_hashmap(void *pKey, void *pValue, void *pContext, K_
     cnv_comm_Free(pKey);
     SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pValue)->pValue);
     netframe_close_socket(pSocketElement->Socket);
+    /*if(strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strProtocol, "UNIXSOCKET") == 0)
+    {
+        unlink(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strUnixDomainPath);
+    }*/
     cnv_comm_Free(pSocketElement);
     cnv_comm_Free(pValue);
 

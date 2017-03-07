@@ -181,6 +181,7 @@ int netframe_tcp_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int n
         LOG_SYS_ERROR("%s, ip:%s, port:%d.", strerror(nErrno), pAddrIP, ulPort);
         if(nErrno != EINPROGRESS)
         {
+            close(Sockfd);
             return -1;
         }
     }
