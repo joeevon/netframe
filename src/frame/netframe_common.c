@@ -526,6 +526,7 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
         if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10)  //超出10s,重置连接次数
         {
             pSvrSockData->nReconTimes = 0;
+            return netframe_long_connect_(pIoThreadContext, pSvrSockData);
         }
 
         return -1;
