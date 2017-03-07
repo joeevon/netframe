@@ -459,17 +459,10 @@ K_BOOL hashmap_earase_callback(void  *pKey, void  *pValue, void  *pContext, K_BO
 
 int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DATA *pSvrSockData)
 {
-    if(pSvrSockData->nMaxReconTimes > 0)
-    {
-        if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10 || pSvrSockData->nReconTimes == 0)
-        {
-            pSvrSockData->nReconTimes = 0;
-            pSvrSockData->nLastConnectTime = cnv_comm_get_utctime();
-        }
-    }
-    else if(pSvrSockData->nMaxReconTimes == 0)
+    if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10 || pSvrSockData->nReconTimes == 0)
     {
         pSvrSockData->nReconTimes = 0;
+        pSvrSockData->nLastConnectTime = cnv_comm_get_utctime();
     }
 
     if(pSvrSockData->nReconTimes <= pSvrSockData->nMaxReconTimes)
@@ -842,10 +835,10 @@ int  netframe_long_connect(IO_THREAD_CONTEXT *pIoThreadContext, CNV_UNBLOCKING_Q
             SERVER_SOCKET_DATA *pSvrSockData = (SERVER_SOCKET_DATA *)queuenode->data_;
 
             //check
-            if(pSvrSockData->nMaxReconTimes < 0 || pSvrSockData->nMaxReconTimes > 100)
+            if(pSvrSockData->nMaxReconTimes <= 0 || pSvrSockData->nMaxReconTimes > 10000)
             {
-                LOG_SYS_ERROR("MaxReconTimes is illegal,%d.", pSvrSockData->nMaxReconTimes);
-                return -1;
+                LOG_SYS_ERROR("MaxReconTimes is illegal,%d, set it default 30.", pSvrSockData->nMaxReconTimes);
+                pSvrSockData->nMaxReconTimes = 30;
             }
 
             if(strcmp(pSvrSockData->strProtocol, "UNIXSOCKET") == 0 && strlen(pSvrSockData->strUnixDomainPath) == 0)
