@@ -838,7 +838,7 @@ int  netframe_long_connect(IO_THREAD_CONTEXT *pIoThreadContext, CNV_UNBLOCKING_Q
             if(pSvrSockData->nMaxReconTimes <= 0 || pSvrSockData->nMaxReconTimes > 10000)
             {
                 LOG_SYS_ERROR("MaxReconTimes is illegal,%d, set it default 30.", pSvrSockData->nMaxReconTimes);
-                pSvrSockData->nMaxReconTimes = 30;
+                pSvrSockData->nMaxReconTimes = 10;
             }
 
             if(strcmp(pSvrSockData->strProtocol, "UNIXSOCKET") == 0 && strlen(pSvrSockData->strUnixDomainPath) == 0)
