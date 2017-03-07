@@ -172,7 +172,7 @@ extern "C"
         int  nHeartBeatLen;   //心跳包长度
         unsigned int nLastConnectTime;  //上一次计时时间
         unsigned int nReconTimes;  //重连次数
-        unsigned int nMaxReconTimes;  //每10s内的重连次数
+        unsigned int nMaxReconTimes;  //每10s内的重连次数, 1 ~ 30
         char strProtocol[16];   //协议 tcp/unixsocket,默认tcp
         char strUnixDomainPath[128];   //unixsocket domain路径
         char *pHeartBeat;    //心跳包数据

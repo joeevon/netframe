@@ -464,6 +464,11 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
         pSvrSockData->nLastConnectTime = cnv_comm_get_utctime();
     }
 
+    if(pSvrSockData->nMaxReconTimes <= 0 || pSvrSockData->nMaxReconTimes > 30)
+    {
+        pSvrSockData->nMaxReconTimes = 10;
+    }
+
     if(pSvrSockData->nReconTimes <= pSvrSockData->nMaxReconTimes)
     {
         pSvrSockData->nReconTimes++;
