@@ -459,7 +459,7 @@ K_BOOL hashmap_earase_callback(void  *pKey, void  *pValue, void  *pContext, K_BO
 
 int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DATA *pSvrSockData)
 {
-    if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > 10 || pSvrSockData->nReconTimes == 0)
+    if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > pSvrSockData->nReconIntercal || pSvrSockData->nReconTimes == 0)
     {
         pSvrSockData->nReconTimes = 0;
         pSvrSockData->nLastConnectTime = cnv_comm_get_utctime();
@@ -835,10 +835,16 @@ int  netframe_long_connect(IO_THREAD_CONTEXT *pIoThreadContext, CNV_UNBLOCKING_Q
             SERVER_SOCKET_DATA *pSvrSockData = (SERVER_SOCKET_DATA *)queuenode->data_;
 
             //check
-            if(pSvrSockData->nMaxReconTimes <= 0 || pSvrSockData->nMaxReconTimes > 10000)
+            if(pSvrSockData->nReconIntercal <= 0 || pSvrSockData->nReconIntercal > 600)
             {
-                LOG_SYS_ERROR("MaxReconTimes is illegal,%d, set it default 10.", pSvrSockData->nMaxReconTimes);
-                pSvrSockData->nMaxReconTimes = 10;
+                LOG_SYS_ERROR("ReconIntercal is illegal,%d, server type:%s , set it default 5s.", pSvrSockData->nReconIntercal, pSvrSockData->strServiceName);
+                pSvrSockData->nReconIntercal = 5;
+            }
+
+            if(pSvrSockData->nMaxReconTimes <= 0 || pSvrSockData->nMaxReconTimes > 100)
+            {
+                LOG_SYS_ERROR("MaxReconTimes is illegal,%d, server type:%s , set it default 3 times.", pSvrSockData->nMaxReconTimes, pSvrSockData->strServiceName);
+                pSvrSockData->nMaxReconTimes = 3;
             }
 
             if(strcmp(pSvrSockData->strProtocol, "UNIXSOCKET") == 0 && strlen(pSvrSockData->strUnixDomainPath) == 0)

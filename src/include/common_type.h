@@ -170,9 +170,10 @@ extern "C"
         int  isRecvSvrData;  //服务端向客户端推送数据
         int  nPort;   //端口
         int  nHeartBeatLen;   //心跳包长度
+        unsigned int nReconIntercal;  //重连间隔  1 ~ 600, 默认5秒
         unsigned int nLastConnectTime;  //上一次计时时间
         unsigned int nReconTimes;  //重连次数
-        unsigned int nMaxReconTimes;  //每10s内的重连次数,1 ~ 10000,默认10次
+        unsigned int nMaxReconTimes;  //每5s内的重连次数,1 ~ 100,默认3次
         char strProtocol[16];   //协议 tcp/unixsocket,默认tcp
         char strUnixDomainPath[128];   //unixsocket domain路径
         char *pHeartBeat;    //心跳包数据
