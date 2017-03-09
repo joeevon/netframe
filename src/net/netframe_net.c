@@ -1,14 +1,3 @@
-/****************************
-    FileName:netframe_net.c
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        netframe_net C文件
-    Note:
-    Author:WangZhiyong
-    Create Date: 2015-05-07
-*****************************/
 #include "netframe_net.h"
 #include "cnv_comm.h"
 #include "netframe_main.h"

@@ -1,15 +1,3 @@
-/****************************
-    FileName:common_type.h
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        common_type 头文件
-    Note:
-    Author:WangZhiyong
-    Create Date: 2015-06-17
-*****************************/
-
 #ifndef  __COMMON_TYPE_H__
 #define   __COMMON_TYPE_H__
 
@@ -188,8 +176,8 @@ extern "C"
     {
         int lDataLen;     //数据长度
         int lConnectID;    //短连接ID
-        char strServIp[DEFAULT_ARRAY_SIZE];   //服务器IP
-        unsigned int ulPort;         //服务器端口
+        char strClientIp[DEFAULT_ARRAY_SIZE];   //对端IP
+        unsigned int ulPort;         //对端端口
         char *pDataSend;   // 解析后可发送的数据
         int handle_io_eventfd;  //handle唤醒io
         int io_thread_index;  //IO线程ID
@@ -204,8 +192,8 @@ extern "C"
         int lAction;   //请求动作(1:发送服务请求 2:客户端应答 3:关闭客户端)
         int lConnectID;    //连接ID
         int lDataLen;     //数据长度
-        char strServIp[DEFAULT_ARRAY_SIZE];   //服务器IP
-        unsigned int ulPort;         //服务器端口
+        char strServIp[DEFAULT_ARRAY_SIZE];   //发送IP
+        unsigned int ulPort;         //发送端口
         char *pDataSend;  //要发送的数据
         void *pCallbackPara;   //回调参数
         int io_thread_index;  //IO线程ID

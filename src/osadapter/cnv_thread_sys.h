@@ -1,15 +1,3 @@
-/****************************
-    FileName:cnv_agent_thread.h
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        cnv_agent_thread 头文件
-    Note:
-    Author:WangZhiyong
-    Create Date: 2015-05-11
-    *****************************/
-
 #ifndef __CNV_THREAD_SYS_H__
 #define __CNV_THREAD_SYS_H__
 

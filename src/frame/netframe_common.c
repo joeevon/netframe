@@ -1,14 +1,3 @@
-/********************************************************
-FileName:cnv_agent.c
-(C) Copyright 2014 by Careland
-凯立德秘密信息
-Description:
-    netframe_common C文件
-Note:
-Author:  WangZhiyong
-    Create Date: 2015-05-08
-*********************************************************/
-
 #include "netframe_common.h"
 #include "cnv_hashmap.h"
 #include "log/cnv_liblog4cplus.h"

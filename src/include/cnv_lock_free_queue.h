@@ -1,16 +1,3 @@
-/**********************************************************
-Copyright (c) 2015, 凯立德 careland.  All rights reserved.
-FileName: cnv_lock_free_queue.h
-Author: wangzy@careland.com.cn
-Version: 1.0
-Date: 2015-07-03
-Description: 多线程无锁队列
-Function List:
-1. 多线程
-2. 原子锁
-3. 支持1对n(n写1读 或 1写n读)
-**********************************************************/
-
 #ifndef  __cnv_lock_free_queue_h__
 #define  __cnv_lock_free_queue_h__
 

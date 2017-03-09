@@ -1,15 +1,3 @@
-/****************************
-    FileName:cnv_core_typedef.h
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        cnv_core_typedef.h文件
-    Note:
-    Author:Wang Zhiyong
-    Create Date: 2015-05-07
-*****************************/
-
 #ifndef __HMI_CORE_TYPEDEF_H_201210101733__    //用这个宏名避免其他项目调用引起重复
 #define __HMI_CORE_TYPEDEF_H_201210101733__
 

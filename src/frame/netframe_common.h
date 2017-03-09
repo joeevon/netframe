@@ -1,15 +1,3 @@
-/****************************
-    FileName:netframe_common.h
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        netframe_common 头文件
-    Note:
-    Author:WangZhiyong
-    Create Date: 2015-05-07
-*****************************/
-
 #ifndef __NETFRAME_COMMON_H__
 #define __NETFRAME_COMMON_H__
 

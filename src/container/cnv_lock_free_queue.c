@@ -1,4 +1,3 @@
-
 #include "cnv_lock_free_queue.h"
 #include <stdlib.h>
 #include <errno.h>

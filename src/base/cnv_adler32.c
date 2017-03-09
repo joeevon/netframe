@@ -1,19 +1,3 @@
-/*===========================================================================
-* Copyright (C), 2003-2011, Careland Software Co,.Ltd
-* File name: alg_crc.c
-* Author: wenap    Version: 1.0.1    Date: 2011/08/24
-* Description: CRC相关函数实现
-*
-* Others:
-*
-* History:
-* 1.Date: 2011/08/24
-*   Version: 1.0.1
-*   Author: wenap
-*   Modification:
-*
-===========================================================================*/
-
 #include "cnv_adler32.h"
 #include "cnv_base_define.h"
 

@@ -1,15 +1,3 @@
-/****************************
-    FileName:netframe_io.c
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        netframe_io  C文件
-    Note:
-    Author:WangZhiyong
-    Create Date: 2015-05-19
-    *****************************/
-
 #include "netframe_io.h"
 #include "common_type.h"
 #include "cnv_comm.h"
@@ -976,12 +964,12 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
 
         IO_TO_HANDLE_DATA *pIOHanldeData = (IO_TO_HANDLE_DATA *)malloc(sizeof(IO_TO_HANDLE_DATA));    //io->handle  header
         pIOHanldeData->lConnectID = atoi((char *)pConnId);
-        memcpy(pIOHanldeData->strServIp, pSocketElement->uSockElement.tClnSockElement.strClientIp, sizeof(pIOHanldeData->strServIp) - 1);
+        memcpy(pIOHanldeData->strClientIp, pSocketElement->uSockElement.tClnSockElement.strClientIp, sizeof(pIOHanldeData->strClientIp) - 1);
         pIOHanldeData->ulPort = pSocketElement->uSockElement.tClnSockElement.uClientPort;
+        pIOHanldeData->pDataSend = pPacket;
         pIOHanldeData->lDataLen = nPacketSize;
         pIOHanldeData->handle_io_eventfd = pIoThreadContext->handle_io_eventfd;
         pIOHanldeData->handle_io_msgque = pIoThreadContext->handle_io_msgque;
-        pIOHanldeData->pDataSend = pPacket;
         pIOHanldeData->pfncnv_handle_business = pSocketElement->uSockElement.tClnSockElement.pfncnv_handle_business;
 
         HANDLE_THREAD_CONTEXT *pHandleContext = NULL;

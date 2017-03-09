@@ -1,22 +1,3 @@
-
-/**********************************************************
-Copyright (c) 2015, 凯立德 careland.  All rights reserved.
-FileName: cnv_queue.h
-Author: zhhuang@careland.com.cn
-Version: 1.0
-Date: 2015-04-10
-Description: 多线程阻塞消息队列
-Others: 采用一个锁，两个条件变量
-Function List:
-1. 多线程
-2. 阻塞式,支持秒级超时机制
-History:
-1.
-Date: 2015.4.16
-Author: zhhuang@careland.com.cn
-增加测试例子
-**********************************************************/
-
 #ifndef CNV_CARELAND_QUEUE_H_
 #define CNV_CARELAND_QUEUE_H_
 

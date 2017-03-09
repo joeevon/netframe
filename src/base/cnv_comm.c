@@ -1,14 +1,3 @@
-/********************************************************
-FileName:cnv_comm.c
-(C) Copyright 2014 by Careland
-凯立德秘密信息
-Description:
-    公共函数C文件
-Note:
-Author:  WangZhiyong
-    Create Date: 2015-05-07
-*********************************************************/
-
 #include "cnv_comm.h"
 #include "cnv_base_define.h"
 

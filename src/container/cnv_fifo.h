@@ -1,13 +1,3 @@
-/**********************************************************
-Copyright (c) 2015, 凯立德 careland.  All rights reserved.
-FileName: cnv_fifo.h
-Author: wangzy@careland.com.cn
-Version: 1.0
-Date: 2015-07-03
-Description: 无锁队列
-Function List:
-1.支持1对1(1读1写)
-**********************************************************/
 #ifndef  __CNV_FIFO_H__
 #define __CNV_FIFO_H__
 

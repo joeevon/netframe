@@ -1,15 +1,3 @@
-/****************************
-    FileName:netframe_main.c
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        服务 入口文件
-    Note:
-    Author:WangZhiyong
-    Create Date: 2015-05-07
-*****************************/
-
 #include "netframe_main.h"
 #include "netframe_common.h"
 #include "log/cnv_liblog4cplus.h"

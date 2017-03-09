@@ -1,15 +1,3 @@
-/****************************
-    FileName:netframe_structdefine.h
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        cnv_structdefine 头文件
-    Note:
-    Author:WangZhiyong
-    Create Date: 2015-05-22
-*****************************/
-
 #ifndef __CNV_STRUCTDEFINE_H__
 #define __CNV_STRUCTDEFINE_H__
 

@@ -1,15 +1,3 @@
-/****************************
-    FileName:netframe_io.h
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        netframe_io h文件
-    Note:
-    Author:WangZhiyong,Lijian
-    Create Date: 2015-05-19
-*****************************/
-
 #ifndef __CNV_AGENT_IO_H__
 #define __CNV_AGENT_IO_H__
 
