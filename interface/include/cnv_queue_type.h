@@ -1,13 +1,3 @@
-
-/**********************************************************
-Copyright (c) 2015, 凯立德 careland.  All rights reserved.
-FileName: cnv_queue_type.h
-Author: wangzy@careland.com.cn
-Version: 1.0
-Date: 2015-07-03
-Description: 非阻塞消息队列
-**********************************************************/
-
 #ifndef __CNV_QUEUE_TYPE_H__
 #define __CNV_QUEUE_TYPE_H__
 

@@ -1,13 +1,3 @@
-
-/**********************************************************
-Copyright (c) 2015, 凯立德 careland.  All rights reserved.
-FileName: cnv_unblock_queue.h
-Author: wangzy@careland.com.cn
-Version: 1.0
-Date: 2015-07-03
-Description: 单线程非阻塞消息队列
-**********************************************************/
-
 #ifndef __CNV_UNBLOCK_QUEUE_H__
 #define __CNV_UNBLOCK_QUEUE_H__
 

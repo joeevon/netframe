@@ -1,17 +1,3 @@
-
-/**********************************************************
-Copyright (c) 2015, 凯立德 careland.  All rights reserved.
-FileName: cnv_blocking_queue.h
-Author: wangzy@careland.com.cn
-Version: 1.0
-Date: 2015-07-03
-Description: 多线程阻塞消息队列
-Function List:
-1. 多线程
-2. 阻塞式,支持秒级超时机制
-3. 可直接交换两个非阻塞队列的指针
-**********************************************************/
-
 #ifndef __CNV_BLOCKING_QUEUE_H__
 #define __CNV_BLOCKING_QUEUE_H__
 

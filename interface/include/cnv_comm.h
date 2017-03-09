@@ -1,13 +1,3 @@
-/********************************************************
-FileName:cnv_comm.h
-(C) Copyright 2014 by Careland
-凯立德秘密信息
-Description:
-    公共函数头文件
-Note:
-Author:  WangZhiyong
-    Create Date: 2015-05-07
-*********************************************************/
 #ifndef __CNV_COMM_H__
 #define __CNV_COMM_H__
 #ifdef __cplusplus

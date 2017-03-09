@@ -1,15 +1,3 @@
-/****************************
-    FileName:common_type.h
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        common_type 头文件
-    Note:
-    Author:WangZhiyong
-    Create Date: 2015-06-17
-*****************************/
-
 #ifndef  __CNV_BASE_DEFINE_H__
 #define   __CNV_BASE_DEFINE_H__
 

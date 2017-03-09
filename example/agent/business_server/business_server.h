@@ -1,15 +1,3 @@
-/****************************
-    FileName:cnv_position.h
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        cnv_position h文件
-    Note:
-    Author:WangZhiyong
-    Create Date: 2015-05-19
-*****************************/
-
 #ifndef __BUSINESS_SERVER_H__
 #define __BUSINESS_SERVER_H__
 
