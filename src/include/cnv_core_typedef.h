@@ -6,8 +6,6 @@ extern "C"
 {
 #endif
 
-    //前缀缩写K K:Careland(凯立德)
-
     typedef char K_CHAR;                    //ASCII 字符
     typedef unsigned char   K_UCHAR;
     typedef unsigned short K_WCHAR;         //unicode 字符

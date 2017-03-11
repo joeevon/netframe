@@ -1,14 +1,3 @@
-/****************************
-    FileName:netframe_accept.c
-    (C) Copyright 2014 by Careland
-    凯立德秘密信息
-    Description:
-    主要功能简述
-        netframe_accept  C文件
-    Note:
-    Author:WangZhiyong
-    Create Date: 2015-05-19
-*****************************/
 
 #define _GNU_SOURCE
 #include "netframe_accept.h"

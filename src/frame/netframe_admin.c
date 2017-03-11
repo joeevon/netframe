@@ -1,15 +1,3 @@
-/****************************
-FileName:netframe_admin.c
-(C) Copyright 2015 by Careland
-凯立德秘密信息
-Description:
-主要功能简述
-    netframe_admin C文件
-Note:
-    Author:Wang Zhiyong
-    Create Date: 2015-11-18
-    *****************************/
-
 #include "netframe_admin.h"
 #include "netframe_structdefine.h"
 #include "cnv_comm.h"
