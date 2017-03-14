@@ -6,8 +6,7 @@ list(APPEND SRC
     netframe_handle.c
     netframe_io.c
     netframe_accept.c
-    netframe_main.c   
-	netframe_admin.c
+    netframe_main.c
     )
 
 list(APPEND LIBS

@@ -254,8 +254,8 @@ int  accept_init_server(ACCEPT_THREAD_CONTEXT *pAcceptContext, ACCEPT_THREAD_ITE
     iterator_unblock_queuqe(queDistribute, printDistribution, NULL);
     if(!strcmp(pAcceptItem->tCallback.strProtocol, "admin"))      //telnet管理
     {
-        pAcceptItem->tCallback.pfncnv_parse_protocol = admin_parse_data;
-        pAcceptItem->tCallback.pfncnv_handle_business = admin_handle_data;
+        /*pAcceptItem->tCallback.pfncnv_parse_protocol = admin_parse_data;
+        pAcceptItem->tCallback.pfncnv_handle_business = admin_handle_data;*/
     }
     else
     {

@@ -918,7 +918,8 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
     {
         char *pPacket = NULL;
         unsigned int nPacketSize = 0;
-        nRet = pfncnvparseprotocol(&(ptClnSockData->pMovePointer), &(ptClnSockData->lDataRemain), &pPacket, &nPacketSize);  //协议解析
+        unsigned int nMoveSize = 0;
+        nRet = pfncnvparseprotocol(&(ptClnSockData->pMovePointer), &(ptClnSockData->lDataRemain), &pPacket, &nPacketSize, &nMoveSize);  //协议解析
         if(nRet != CNV_PARSE_SUCCESS)
         {
             if(nRet == CNV_PARSE_FINISH)  //结束解析而且有剩余数据
@@ -939,8 +940,8 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
             }
             else if(nRet == CNV_PARSE_MOVE)     //数据偏移
             {
-                ptClnSockData->lDataRemain -= nPacketSize;      //总数据长度减去一个包的数据大小
-                ptClnSockData->pMovePointer += nPacketSize; //数据缓存指针偏移
+                ptClnSockData->lDataRemain -= nMoveSize;      //总数据长度减去一个包的数据大小
+                ptClnSockData->pMovePointer += nMoveSize; //数据缓存指针偏移
                 continue;
             }
             else if(nRet == CNV_PARSE_ERROR)    //解析错误,关闭客户端
@@ -951,15 +952,15 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
             break;
         }
 
-        if(nPacketSize > ptClnSockData->lDataRemain)
+        if(nMoveSize > ptClnSockData->lDataRemain)
         {
             LOG_SYS_ERROR("nPacketSize larger than lDataRemain.");
             remove_client_socket_hashmap(Epollfd, HashConnidFd, pConnId);
             break;
         }
 
-        ptClnSockData->lDataRemain -= nPacketSize;      //总数据长度减去一个包的数据大小
-        ptClnSockData->pMovePointer += nPacketSize; //数据缓存指针偏移
+        ptClnSockData->lDataRemain -= nMoveSize;      //总数据长度减去一个包的数据大小
+        ptClnSockData->pMovePointer += nMoveSize; //数据缓存指针偏移
         pIoThreadContext->tMonitorElement.lParsePackNum++;
 
         IO_TO_HANDLE_DATA *pIOHanldeData = (IO_TO_HANDLE_DATA *)malloc(sizeof(IO_TO_HANDLE_DATA));    //io->handle  header
