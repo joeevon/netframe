@@ -29,12 +29,13 @@ K_BOOL printhashmap(void  *pKey, void  *pValue, void  *pContext)
 int netframe_init_path(char *strConfPath)
 {
     //配置文件
-    snprintf(g_params.tConfigPath.strConfigPath, sizeof(g_params.tConfigPath.strConfigPath) - 1, "%s", strConfPath);
-    cnv_comm_StrcatA(g_params.tConfigPath.strConfigPath, "net_frame.xml");
+    /*snprintf(g_params.tConfigPath.strConfigPath, sizeof(g_params.tConfigPath.strConfigPath) - 1, "%s", strConfPath);
+    cnv_comm_StrcatA(g_params.tConfigPath.strConfigPath, "net_frame.xml");*/
+    memcpy(g_params.tConfigPath.strConfigPath, strConfPath, sizeof(g_params.tConfigPath.strConfigPath) - 1);
 
     //日志目录
-    snprintf(g_params.tConfigPath.strLogDir, sizeof(g_params.tConfigPath.strLogDir) - 1, "%s", strConfPath);
-    cnv_comm_StrcatA(g_params.tConfigPath.strLogDir, "../logs");
+    /*snprintf(g_params.tConfigPath.strLogDir, sizeof(g_params.tConfigPath.strLogDir) - 1, "%s", strConfPath);
+    cnv_comm_StrcatA(g_params.tConfigPath.strLogDir, "../logs");*/
 
     return CNV_ERR_OK;
 }
