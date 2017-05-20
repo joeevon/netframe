@@ -103,7 +103,7 @@ int  initial_netframe(char *strConfPath, CNV_UNBLOCKING_QUEUE *queServer, int nM
 
     if(nMaxPacketSize <= 0 || nMaxPacketSize > MAX_PACKET_SZIE)
     {
-        LOG_SYS_FATAL("buffer size is illegal:%d! it should between 0 and 65000.", nMaxPacketSize);
+        LOG_SYS_FATAL("buffer size is illegal:%d! it should between 0 and 1024*1024.", nMaxPacketSize);
         return -1;
     }
     g_params.nMaxBufferSize = nMaxPacketSize;

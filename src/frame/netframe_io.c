@@ -954,7 +954,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
 
         if(nMoveSize > ptClnSockData->lDataRemain)
         {
-            LOG_SYS_ERROR("nPacketSize larger than lDataRemain.");
+            LOG_SYS_ERROR("MoveSize larger than DataRemain.");
             remove_client_socket_hashmap(Epollfd, HashConnidFd, pConnId);
             break;
         }

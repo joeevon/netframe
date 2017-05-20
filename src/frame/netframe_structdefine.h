@@ -25,7 +25,7 @@ extern "C"
 #define  DEFAULT_QUEUE_CAPCITY  300000    //默认queue大小    
 #define  DEFAULF_EPOLL_SIZE   30000      //epoll size   
 #define  DEFAULF_FILTED_CLIENTS   32
-#define  MAX_PACKET_SZIE  65000   //每个数据包的最大值
+#define  MAX_PACKET_SZIE  1024*1024   //每个数据包的最大值  1M
 #define  REMAIN_BUFFER_SIZE  1024     //remain size
 
     typedef enum __enumDISTRIBUTE_TYPE
