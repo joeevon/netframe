@@ -449,49 +449,28 @@ K_BOOL hashmap_earase_callback(void  *pKey, void  *pValue, void  *pContext, K_BO
 
 int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DATA *pSvrSockData)
 {
-    if(cnv_comm_get_utctime() - pSvrSockData->nLastConnectTime > pSvrSockData->nReconIntercal || pSvrSockData->nReconTimes == 0)
+    if(cnv_comm_get_utctime() - pIoThreadContext->nLastConnectTime > pSvrSockData->nReconIntercal || pIoThreadContext->nReconTimes == 0)
     {
-        pSvrSockData->nReconTimes = 0;
-        pSvrSockData->nLastConnectTime = cnv_comm_get_utctime();
+        pIoThreadContext->nReconTimes = 0;
+        pIoThreadContext->nLastConnectTime = cnv_comm_get_utctime();
     }
 
-    if(pSvrSockData->nReconTimes <= pSvrSockData->nMaxReconTimes)
+    if(pIoThreadContext->nReconTimes <= pSvrSockData->nMaxReconTimes)
     {
-        pSvrSockData->nReconTimes++;
-        int nSocket = 0;
-        int nRet = -1;
+        pIoThreadContext->nReconTimes++;
+        int nSocket = 0, nRet = -1;
+        int nEveryTimeOut = 300, nReconTimes = 1;
 
-        if(strlen(pSvrSockData->strProtocol) == 0 || strcmp(pSvrSockData->strProtocol, "TCP") == 0)    //默认tcp协议
+        do
         {
-            int nTimeOut = 50000;
-            int nReconTimes = 1;  //重连次数
-
-            do
-            {
-                nRet = netframe_tcp_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->nPort, nTimeOut); //创建连接
-                nTimeOut *= 2;
-            }
-            while(nRet != CNV_ERR_OK && nReconTimes++ < 7);
+            nRet = netframe_tcp_connect(&nSocket, pSvrSockData->strServerIp, pSvrSockData->nPort, nEveryTimeOut);    //创建连接
+            nEveryTimeOut *= 2;
         }
-        else if(strcmp(pSvrSockData->strProtocol, "UNIXSOCKET") == 0)   //unixsocket协议
-        {
-            nRet = netframe_unixsocket_connect(&nSocket, pSvrSockData->strUnixDomainPath);
-        }
+        while(nRet != CNV_ERR_OK && nReconTimes++ < 5);
 
         if(nRet != CNV_ERR_OK)
         {
             return -1;
-        }
-
-        if(pSvrSockData->isRecvSvrData == 1)   //需要接收服务端数据
-        {
-            nRet = hash_add_conidfd(nSocket, pSvrSockData, pIoThreadContext);  //客户端hashmap
-            if(nRet != CNV_ERR_OK)
-            {
-                LOG_SYS_ERROR("hash_add_conidfd failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->nPort);
-                netframe_close_socket(nSocket);
-                return -1;
-            }
         }
 
         nRet = hash_add_addrsocket(nSocket, pSvrSockData, pIoThreadContext->HashAddrFd); //服务端hashmap
@@ -502,15 +481,26 @@ int netframe_long_connect_(IO_THREAD_CONTEXT *pIoThreadContext, SERVER_SOCKET_DA
             return -1;
         }
 
-        if(pSvrSockData->isReqLogin == 1)      //是否发送登录验证
-        {
-            nRet = netframe_req_login(nSocket, pSvrSockData);
-            if(nRet != CNV_ERR_OK)
-            {
-                LOG_SYS_ERROR("netframe_req_login failed!");
-                exit(-1);
-            }
-        }
+        //if(pSvrSockData->isRecvSvrData == 1)   //需要接收服务端数据
+        //{
+        //    nRet = hash_add_conidfd(nSocket, pSvrSockData, pIoThreadContext);  //客户端hashmap
+        //    if(nRet != CNV_ERR_OK)
+        //    {
+        //        LOG_SYS_ERROR("hash_add_conidfd failed, ip:%s, port:%d", pSvrSockData->strServerIp, pSvrSockData->nPort);
+        //        netframe_close_socket(nSocket);
+        //        return -1;
+        //    }
+        //}
+
+        //if(pSvrSockData->isReqLogin == 1)      //是否发送登录验证
+        //{
+        //    nRet = netframe_req_login(nSocket, pSvrSockData);
+        //    if(nRet != CNV_ERR_OK)
+        //    {
+        //        LOG_SYS_ERROR("netframe_req_login failed!");
+        //        exit(-1);
+        //    }
+        //}
     }
     else
     {
@@ -825,22 +815,16 @@ int  netframe_long_connect(IO_THREAD_CONTEXT *pIoThreadContext, CNV_UNBLOCKING_Q
             SERVER_SOCKET_DATA *pSvrSockData = (SERVER_SOCKET_DATA *)queuenode->data_;
 
             //check
-            if(pSvrSockData->nReconIntercal <= 0 || pSvrSockData->nReconIntercal > 600)
+            if(pSvrSockData->nReconIntercal <= 0 || pSvrSockData->nReconIntercal > 300)
             {
-                LOG_SYS_ERROR("ReconIntercal is illegal,%d, server type:%s , set it default 5s.", pSvrSockData->nReconIntercal, pSvrSockData->strServiceName);
-                pSvrSockData->nReconIntercal = 5;
+                LOG_SYS_ERROR("ReconIntercal is illegal,%d, server type:%s , set it default 10s.", pSvrSockData->nReconIntercal, pSvrSockData->strServiceName);
+                pSvrSockData->nReconIntercal = 10;
             }
 
-            if(pSvrSockData->nMaxReconTimes <= 0 || pSvrSockData->nMaxReconTimes > 100)
+            if(pSvrSockData->nMaxReconTimes <= 0 || pSvrSockData->nMaxReconTimes > 10)
             {
                 LOG_SYS_ERROR("MaxReconTimes is illegal,%d, server type:%s , set it default 3 times.", pSvrSockData->nMaxReconTimes, pSvrSockData->strServiceName);
                 pSvrSockData->nMaxReconTimes = 3;
-            }
-
-            if(strcmp(pSvrSockData->strProtocol, "UNIXSOCKET") == 0 && strlen(pSvrSockData->strUnixDomainPath) == 0)
-            {
-                LOG_SYS_ERROR("unix domain path is empty.");
-                return -1;
             }
 
             netframe_long_connect_(pIoThreadContext, pSvrSockData);

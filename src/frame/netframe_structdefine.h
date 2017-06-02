@@ -82,6 +82,8 @@ extern "C"
         int  timerfd_monitor;     //服务监视
         int  accept_io_eventfd;  //accept唤醒io
         int  handle_io_eventfd;  //handle唤醒io
+        unsigned int nLastConnectTime;  //上一次计时时间
+        unsigned int nReconTimes;  //已经重连次数
         char  threadname[16];
         short  threadindex;
         int  SeedOfKey;

@@ -759,10 +759,7 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
         }
 
         SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)malloc(sizeof(SOCKET_ELEMENT));
-        if(!pSocketElement)
-        {
-            continue;
-        }
+        assert(pSocketElement);
         memset(pSocketElement, 0x00, sizeof(SOCKET_ELEMENT));
         pSocketElement->Socket = AcceptIOData.fd;
         pSocketElement->Time = cnv_comm_get_utctime();
@@ -791,18 +788,11 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
         if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)    //接收数据缓存
         {
             pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer = (char *)malloc(g_params.nMaxBufferSize);
-            if(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer == NULL)
-            {
-                return  CNV_ERR_MALLOC;
-            }
+            assert(pSocketElement->uSockElement.tClnSockElement.SocketData.pDataBuffer);
         }
 
         char *pKey = (char *)malloc(33);
-        if(!pKey)
-        {
-            cnv_comm_Free(pSocketElement);
-            continue;
-        }
+        assert(pKey);
         memset(pKey, 0, 33);
 
         if(AcceptIOData.uMapType == 0)   //用连接ID做映射
@@ -826,12 +816,7 @@ int iothread_recv_accept(int Epollfd, int Eventfd, cnv_fifo *accept_io_msgque, v
         }
 
         HASHMAP_VALUE  *pHashValue = (HASHMAP_VALUE *)malloc(sizeof(HASHMAP_VALUE));
-        if(!pHashValue)
-        {
-            cnv_comm_Free(pSocketElement);
-            cnv_comm_Free(pKey);
-            continue;
-        }
+        assert(pHashValue);
         pHashValue->lSize = sizeof(HASHMAP_VALUE);
         pHashValue->pValue = (char *)pSocketElement;
 
@@ -964,6 +949,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
         pIoThreadContext->tMonitorElement.lParsePackNum++;
 
         IO_TO_HANDLE_DATA *pIOHanldeData = (IO_TO_HANDLE_DATA *)malloc(sizeof(IO_TO_HANDLE_DATA));    //io->handle  header
+        assert(pIOHanldeData);
         pIOHanldeData->lConnectID = atoi((char *)pConnId);
         memcpy(pIOHanldeData->strClientIp, pSocketElement->uSockElement.tClnSockElement.strClientIp, sizeof(pIOHanldeData->strClientIp) - 1);
         pIOHanldeData->ulPort = pSocketElement->uSockElement.tClnSockElement.uClientPort;

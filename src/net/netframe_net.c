@@ -44,7 +44,7 @@ int netframe_init_tcpserver(int *pSocket, struct sockaddr_in *pSockAddr, int lMa
 
     if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(int)) < 0)
     {
-        netframe_close_socket(fd);
+        close(fd);
         return AGENT_NET_ADDR_IN_USE;
     }
 
@@ -52,7 +52,7 @@ int netframe_init_tcpserver(int *pSocket, struct sockaddr_in *pSockAddr, int lMa
     if(nRet != CNV_ERR_OK)
     {
         LOG_SYS_ERROR("netframe_setblockopt failed!");
-        netframe_close_socket(fd);
+        close(fd);
         return nRet;
     }
 
@@ -60,14 +60,14 @@ int netframe_init_tcpserver(int *pSocket, struct sockaddr_in *pSockAddr, int lMa
     if(nRet < 0)
     {
         LOG_SYS_ERROR("bind failed!");
-        netframe_close_socket(fd);
+        close(fd);
         return AGENT_NET_BIND_FAILED;
     }
 
     if(listen(fd, lMaxCout) < 0)
     {
         LOG_SYS_ERROR("listen failed!");
-        netframe_close_socket(fd);
+        close(fd);
         return AGENT_NET_LISTEN_FAILED;
     }
 
@@ -95,7 +95,7 @@ int netframe_init_udpserver(int *pSocket, struct sockaddr_in *pSockAddr)
     if(nRet < 0)
     {
         LOG_SYS_ERROR("%s", strerror(errno));
-        netframe_close_socket(fd);
+        close(fd);
         return AGENT_NET_BIND_FAILED;
     }
 
@@ -121,7 +121,7 @@ int netframe_init_unixsocket(int *pSocket, struct sockaddr_un *pSockAddr)
     if(nRet < 0)
     {
         LOG_SYS_ERROR("netframe_init_unixsocket bind failed!");
-        netframe_close_socket(ServFd);
+        close(ServFd);
         unlink(pSockAddr->sun_path);
         return AGENT_NET_BIND_FAILED;
     }
@@ -130,7 +130,7 @@ int netframe_init_unixsocket(int *pSocket, struct sockaddr_un *pSockAddr)
     if(nRet < 0)
     {
         LOG_SYS_ERROR("netframe_init_unixsocket listen failed!");
-        netframe_close_socket(ServFd);
+        close(ServFd);
         unlink(pSockAddr->sun_path);
         return AGENT_NET_LISTEN_FAILED;
     }
@@ -148,7 +148,7 @@ int netframe_tcp_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int n
     int Sockfd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_TCP);
     if(Sockfd == -1)
     {
-        LOG_SYS_ERROR("%s", strerror(errno));
+        LOG_SYS_ERROR("%s.", strerror(errno));
         return AGENT_NET_CREATE_SOCKET_FAILED;
     }
 
@@ -160,15 +160,15 @@ int netframe_tcp_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int n
     int nRet = connect(Sockfd, (struct sockaddr *)&tServAddr, sizeof(struct sockaddr));
     if(nRet == 0)
     {
-        LOG_SYS_INFO("connect %s %d success.", pAddrIP, ulPort);
+        LOG_SYS_INFO("connect to %s:%d success.", pAddrIP, ulPort);
         *pSocket = Sockfd;
         return CNV_ERR_OK;
     }
     else
     {
         int nErrno = errno;
-        LOG_SYS_ERROR("%s, ip:%s, port:%d.", strerror(nErrno), pAddrIP, ulPort);
-        if(nErrno != EINPROGRESS)
+        LOG_SYS_ERROR("connect to %s:%d failed, %s.", pAddrIP, ulPort , strerror(nErrno));
+        if(nErrno != EINPROGRESS && nErrno != EINTR && nErrno != EISCONN)
         {
             close(Sockfd);
             return -1;
@@ -180,43 +180,45 @@ int netframe_tcp_connect(int *pSocket, char *pAddrIP, unsigned int ulPort, int n
     FD_SET(Sockfd, &writefds);
 
     struct timeval timeout;
-    timeout.tv_sec = nTimeOut / 1000000;
-    timeout.tv_usec = nTimeOut % 1000000;
+    timeout.tv_sec = nTimeOut / 1000;
+    timeout.tv_usec = (nTimeOut % 1000) * 1000;
+    //timeout.tv_sec = 1;
+    //timeout.tv_usec = 0;
 
     nRet = select(Sockfd + 1, NULL, &writefds, NULL, &timeout);
     if(nRet <= 0)
     {
-        LOG_SYS_ERROR("%s", strerror(errno));
-        netframe_close_socket(Sockfd);
+        LOG_SYS_ERROR("%s.", strerror(errno));
+        close(Sockfd);
         return -1;
     }
-    LOG_SYS_DEBUG("return of select is %d", nRet);
+    LOG_SYS_ERROR("select return %d.", nRet);
 
-    if(FD_ISSET(Sockfd, &writefds) == 0)
+    //if (FD_ISSET(Sockfd, &writefds) == 0)
+    //{
+    //  LOG_SYS_ERROR("no events on Sockfd found");
+    //  netframe_close_socket(Sockfd);
+    //  return -1;
+    //}
+
+    int nErrno = 0;
+    socklen_t nLength = sizeof(nErrno);
+    if(getsockopt(Sockfd, SOL_SOCKET, SO_ERROR, &nErrno, &nLength) < 0)
     {
-        LOG_SYS_ERROR("no events on Sockfd found");
-        netframe_close_socket(Sockfd);
+        LOG_SYS_ERROR("%s.", strerror(errno));
+        close(Sockfd);
         return -1;
     }
 
-    int nError = 0;
-    socklen_t nLength = sizeof(nError);
-    if(getsockopt(Sockfd, SOL_SOCKET, SO_ERROR, &nError, &nLength) < 0)
+    if(nErrno != 0)
     {
-        LOG_SYS_ERROR("%s", strerror(errno));
-        netframe_close_socket(Sockfd);
-        return -1;
-    }
-
-    if(nError != 0)
-    {
-        LOG_SYS_ERROR("connect %s %d failed, %s", pAddrIP, ulPort, strerror(nError));
-        netframe_close_socket(Sockfd);
+        LOG_SYS_ERROR("connect to %s:%d failed, %s.", pAddrIP, ulPort, strerror(nErrno));
+        close(Sockfd);
         return -1;
     }
 
     *pSocket = Sockfd;
-    LOG_SYS_INFO("connect %s %d success.", pAddrIP, ulPort);
+    LOG_SYS_ERROR("connect to %s:%d, %s.", pAddrIP, ulPort, strerror(nErrno));
     return 0;
 }
 
@@ -420,20 +422,22 @@ int netframe_write(int Socket, char *pDataBuffer, int nDataLen, int *pnLenAlread
         int nErrno = errno;
         if(nErrno == EAGAIN)
         {
-            LOG_SYS_DEBUG("EAGAIN happens.");
+            LOG_SYS_ERROR("%s.", strerror(nErrno));
+            nSendLen = 0;
         }
         else if(nErrno == EINTR)
         {
-            LOG_SYS_ERROR("error type:EINTR, write is busy.");
+            LOG_SYS_ERROR("%s.", strerror(nErrno));
+            nSendLen = 0;
         }
         else
         {
-            LOG_SYS_ERROR("%s", strerror(nErrno));
+            LOG_SYS_ERROR("%s.", strerror(nErrno));
             return AGENT_NET_CONNECTION_ABNORMAL;
         }
     }
 
-    if(nSendLen != nDataLen && (nSendLen > 0 && pnLenAlreadyWrite))    //数据发送不完整
+    if(nSendLen != nDataLen && pnLenAlreadyWrite)    //数据发送不完整
     {
         *pnLenAlreadyWrite = nSendLen;
         LOG_SYS_ERROR("write %d bytes, remain %d bytes.", nSendLen, (nDataLen - nSendLen));

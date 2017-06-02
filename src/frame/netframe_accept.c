@@ -206,13 +206,13 @@ int accept_client_connect(int nServerFd, ACCEPT_THREAD_CONTEXT *pAcceptContext, 
         return -1;
     }
 
-    nRet = accept_filter_client(pAcceptItem, &tClientAddr);
-    if(nRet != 0)
-    {
-        LOG_SYS_ERROR("not allowed client, ip:%s", inet_ntoa(tClientAddr.sin_addr));
-        netframe_close_socket(nClientfd);
-        return -1;
-    }
+    //nRet = accept_filter_client(pAcceptItem, &tClientAddr);
+    //if(nRet != 0)
+    //{
+    //    LOG_SYS_ERROR("not allowed client, ip:%s", inet_ntoa(tClientAddr.sin_addr));
+    //    netframe_close_socket(nClientfd);
+    //    return -1;
+    //}
 
     ACCEPT_TO_IO_DATA  tAcceptIOData = { 0 };
     nRet = accept_set_iodata(nClientfd, pAcceptItem, &tClientAddr, &tAcceptIOData);   //写入IO队列的数据
@@ -260,9 +260,9 @@ int  accept_init_server(ACCEPT_THREAD_CONTEXT *pAcceptContext, ACCEPT_THREAD_ITE
     else
     {
         set_callback_function(CLIENT_CALLBACK_FUNC, &(pAcceptItem->tCallback));  //设置回调函数
-        if(pAcceptItem->tCallback.pfncnv_handle_business == NULL)
+        if(pAcceptItem->tCallback.pfncnv_parse_protocol == NULL || pAcceptItem->tCallback.pfncnv_handle_business == NULL)
         {
-            LOG_SYS_ERROR("handle callback function is null.");
+            LOG_SYS_ERROR("callback function is abnormal.");
             return -1;
         }
     }
@@ -358,13 +358,13 @@ int  accept_init_server(ACCEPT_THREAD_CONTEXT *pAcceptContext, ACCEPT_THREAD_ITE
             return CNV_ERR_CONFIG;
         }
 
-        char *pKey = (char *)cnv_comm_Malloc(sizeof(int));
+        char *pKey = (char *)cnv_comm_Malloc(33);
         if(!pKey)
         {
             return  CNV_ERR_MALLOC;
         }
-        memset(pKey, 0x00, sizeof(int));  // 没有memset，后面get不到
-        snprintf(pKey, sizeof(int), "%d", Socket);
+        memset(pKey, 0, 33);  // 没有memset，后面get不到
+        snprintf(pKey, 32, "%d", Socket);
 
         char *pValue = (char *)cnv_comm_Malloc(sizeof(ACCEPT_THREAD_ITEM));
         if(!pValue)

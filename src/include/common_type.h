@@ -154,20 +154,16 @@ extern "C"
 
     typedef  struct  __SERVER_SOCKET_DATA
     {
-        int  isReqLogin;   //是否发送登录请求
-        int  isRecvSvrData;  //服务端向客户端推送数据
-        int  nPort;   //端口
-        int  nHeartBeatLen;   //心跳包长度
-        unsigned int nReconIntercal;  //重连间隔  1 ~ 600, 默认5秒
-        unsigned int nLastConnectTime;  //上一次计时时间
-        unsigned int nReconTimes;  //重连次数
-        unsigned int nMaxReconTimes;  //每5s内的重连次数,1 ~ 100,默认3次
-        char strProtocol[16];   //协议 tcp/unixsocket,默认tcp
-        char strUnixDomainPath[128];   //unixsocket domain路径
-        char *pHeartBeat;    //心跳包数据
         char strServerIp[DEFAULT_ARRAY_SIZE];   //服务器IP
+        int  nPort;   //端口
         char strServiceName[DEFAULT_ARRAY_SIZE];  //服务名字,供找同类服务器使用
-        char strLoginReqInfo[256];     //登录请求信息
+        int  isRecvSvrData;  //是否接受服务端数据
+        char *pHeartBeat;    //心跳包数据
+        int  nHeartBeatLen;   //心跳包长度
+        int  isReqLogin;   //是否发送登录请求
+        char strLoginReqInfo[256];     //登录信息
+        unsigned int nReconIntercal;  //重连间隔  5 ~ 300, 默认10秒
+        unsigned int nMaxReconTimes;  //重连间隔内的重连次数,1 ~ 10,默认3次
         CALLBACK_STRUCT_T tCallback;    //设置回调函数结构体
     } SERVER_SOCKET_DATA;
 
