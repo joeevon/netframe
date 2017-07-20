@@ -37,13 +37,13 @@ extern "C"
     enumDISTRIBUTE_TYPE;
 
     //HANDLE CONTEXT
-    struct __IO_THREAD_CONTEXT;
     typedef struct  __HANDLE_THREAD_CONTEXT
     {
         int  lthreadindex;
         char  threadname[20];
         int  Epollfd;
         int  io_handle_eventfd;  //io唤醒handle
+        void *HashTimerAdd;    //key:unique key   valude:cb function
         void *HashTimerTask;    //key:taskname   valude:cb function
         CNV_UNBLOCKING_QUEUE *queDistribute;    //存放负载的线程
         CNV_UNBLOCKING_QUEUE *queParamFrames;   //框架handle使用的参数,有业务初始化好传进,所以由业务释放
@@ -251,7 +251,9 @@ extern "C"
     typedef  struct  _TIMER_TASK_STRUCT
     {
         int timerfd;
+        void *arg;
         pfnCNV_HANDLE_CALLBACK  pfnHADLE_CALLBACK;
+        pfnCNV_TIMER_CALLBACK pfnTIMER_CALLBACK;
     } TIMER_TASK_STRUCT;
 
     // 全局配置

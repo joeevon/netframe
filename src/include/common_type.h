@@ -79,7 +79,7 @@ extern "C"
         queuerespond里的数据有业务申请内存，框架释放
     参数:
       =========================================================*/
-    typedef void (*pfnCNV_HANDLE_BUSINESS)(const struct __IO_TO_HANDLE_DATA *ptIoHandleData, CNV_UNBLOCKING_QUEUE *queuerespond, void *pHandleParam);
+    typedef void (*pfnCNV_HANDLE_BUSINESS)(const struct __IO_TO_HANDLE_DATA *ptIoHandleData, CNV_UNBLOCKING_QUEUE *queuerespond, void *HashTimer, int  Epollfd, void *pHandleParam);
 
     /*=======================================================
     功能:
@@ -109,6 +109,12 @@ extern "C"
         ptHandleIoData由业务申请内存，框架释放
     =========================================================*/
     typedef void(*pfnCNV_MONITOR_CALLBACK)(MONITOR_ELEMENT *ptMonitorElement, struct __STATISTICS_QUEQUE_DATA **ptStatisQueData);
+
+    /*=======================================================
+    功能:
+        定时回调函数
+    =========================================================*/
+    typedef void(*pfnCNV_TIMER_CALLBACK)(void *arg, void *arg2);
 
     /*=======================================================
     功能:
@@ -240,6 +246,11 @@ extern "C"
         CNV_UNBLOCKING_QUEUE queParamFrameUse;   //框架handle使用的
         void *pBusinessParams;    //业务使用的
     } HANDLE_PARAMS;
+
+    /*=======================================================
+    添加定时任务
+    =========================================================*/
+    extern void add_timer(void *HashTimerAdd, int Epollfd, char *pKey, int nInterval, pfnCNV_TIMER_CALLBACK pfncb, void *arg);
 
 #ifdef __cplusplus
 };

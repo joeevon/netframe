@@ -54,7 +54,7 @@ void handlethread_handle_iomsg(int  EventfdIo, void *pBusinessParams, HANDLE_THR
         return;
     }
 
-    pIOHanldeData->pfncnv_handle_business(pIOHanldeData, &pHandleContext->queuerespond, pBusinessParams);  //执行回调函数
+    pIOHanldeData->pfncnv_handle_business(pIOHanldeData, &pHandleContext->queuerespond, pHandleContext->HashTimerAdd, pHandleContext->Epollfd, pBusinessParams);  //执行回调函数
 
     int nRet = CNV_ERR_OK;
     K_BOOL bIsWakeIO = K_FALSE;
@@ -222,11 +222,11 @@ int  handle_thread_run(void *pThreadParameter)
                     else   //定时事件
                     {
                         void *pOutValue = NULL;
-                        if(cnv_hashmap_get(pHandleContext->HashTimerTask, szEpollEvent[i].data.ptr, &pOutValue) == K_SUCCEED)    //有定时服务
+                        if(pHandleContext->HashTimerTask && cnv_hashmap_get(pHandleContext->HashTimerTask, szEpollEvent[i].data.ptr, &pOutValue) == K_SUCCEED)    //有定时服务
                         {
                             HASHMAP_VALUE *pHashValue = (HASHMAP_VALUE *)pOutValue;
                             TIMER_TASK_STRUCT *ptCbFunctionStr = (TIMER_TASK_STRUCT *)pHashValue->pValue;
-                            nRet = read(ptCbFunctionStr->timerfd, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
+                            read(ptCbFunctionStr->timerfd, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
 
                             STATISTICS_QUEQUE_DATA *ptStatisQueData = NULL;
                             ptCbFunctionStr->pfnHADLE_CALLBACK(&ptStatisQueData, pHandleParams->pBusinessParams);
@@ -244,6 +244,20 @@ int  handle_thread_run(void *pThreadParameter)
                             {
                                 LOG_SYS_FATAL("io wake up accept failed !");
                             }
+                        }
+
+                        void *pTimerAdd = NULL;
+                        if(cnv_hashmap_get(pHandleContext->HashTimerAdd, szEpollEvent[i].data.ptr, &pTimerAdd) == K_SUCCEED)
+                        {
+                            TIMER_TASK_STRUCT *ptCbFunctionStr = (TIMER_TASK_STRUCT *)(((HASHMAP_VALUE *)pTimerAdd)->pValue);
+                            ptCbFunctionStr->pfnTIMER_CALLBACK(szEpollEvent[i].data.ptr, ptCbFunctionStr->arg);
+                            read(ptCbFunctionStr->timerfd, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
+                            close(ptCbFunctionStr->timerfd);
+                            netframe_delete_event(Epollfd, ptCbFunctionStr->timerfd);
+                            cnv_hashmap_remove(pHandleContext->HashTimerAdd, szEpollEvent[i].data.ptr, NULL);
+                            free(((HASHMAP_VALUE *)pTimerAdd)->pValue);
+                            free(pTimerAdd);
+                            free(szEpollEvent[i].data.ptr);
                         }
                     }
                 }
@@ -286,6 +300,8 @@ void handle_thread_uninit(HANDLE_THREAD_CONTEXT *pHandleContexts)
         close(pHandleContext->Epollfd);
         cnv_hashmap_erase(pHandleContext->HashTimerTask, earase_hashtimer_callback, NULL);
         cnv_hashmap_uninit(pHandleContext->HashTimerTask);
+        cnv_hashmap_erase(pHandleContext->HashTimerAdd, earase_hashtimer_callback, NULL);
+        cnv_hashmap_uninit(pHandleContext->HashTimerAdd);
         free_iohandle_lockfreequeue(&(pHandleContext->io_handle_msgque));
         lockfree_queue_uninit(&(pHandleContext->io_handle_msgque));
         free_handleio_unblockqueue(&(pHandleContext->queuerespond));  //  写给IO的队列
@@ -315,6 +331,8 @@ int  handle_thread_init(HANDLE_THREAD_ITEM *pConfigHandleItem, HANDLE_THREAD_CON
         return CNV_ERR_MALLOC;
     }
     initiate_unblock_queue(pHandleContext->queDistribute, 30);      //负载队列
+
+    cnv_hashmap_init(&pHandleContext->HashTimerAdd, 5000, cnv_hashmap_charhash, cnv_hashmap_charequals);
 
     HANDLE_PARAMS *pHandleParams = (HANDLE_PARAMS *)pHandleContext->pHandleParam;
     pHandleContext->queParamFrames = &pHandleParams->queParamFrameUse;

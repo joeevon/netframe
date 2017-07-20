@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <sys/timerfd.h>
 #include <unistd.h>
+#include <time.h>
+#include <assert.h>
 
 extern GLOBAL_PARAMS  g_params;      //全局配置参数
 
@@ -851,6 +853,44 @@ int netframe_reconnect_server(SERVER_SOCKET_DATA *pSvrSockData, IO_THREAD_CONTEX
 int  get_current_hashkey(IO_THREAD_CONTEXT  *pIoThreadContext)
 {
     return  pIoThreadContext->SeedOfKey;
+}
+
+void add_timer(void *HashTimerAdd, int Epollfd, char *pKey, int nInterval, pfnCNV_TIMER_CALLBACK pfncb, void *arg)
+{
+    char *pHashKey = (char *)malloc(128);
+    assert(pHashKey);
+    memset(pHashKey, 0, 128);
+    snprintf(pHashKey, 127, "%s", pKey);
+
+    TIMER_TASK_STRUCT *ptTimerStr = (TIMER_TASK_STRUCT *)malloc(sizeof(TIMER_TASK_STRUCT));
+    assert(ptTimerStr);
+    ptTimerStr->pfnTIMER_CALLBACK = pfncb;
+    ptTimerStr->timerfd = timerfd_create(CLOCK_REALTIME, 0);
+    ptTimerStr->arg = arg;
+
+    HASHMAP_VALUE *pHashValue = (HASHMAP_VALUE *)malloc(sizeof(HASHMAP_VALUE));
+    assert(pHashValue);
+    pHashValue->pKey = pHashKey;
+    pHashValue->pValue = (char *)ptTimerStr;
+
+    cnv_hashmap_put(HashTimerAdd, pHashKey, pHashValue, NULL);
+
+    int nRet = netframe_setblockopt(ptTimerStr->timerfd, K_FALSE);
+    if(nRet != CNV_ERR_OK)
+    {
+        LOG_SYS_FATAL("netframe_setblockopt failed!");
+        return;
+    }
+
+    nRet = netframe_add_readevent(Epollfd, ptTimerStr->timerfd, pHashKey);
+    if(nRet != CNV_ERR_OK)
+    {
+        return;
+    }
+
+    struct itimerspec tTimerspec = { { 0 }, { 0 } };
+    tTimerspec.it_value.tv_sec = nInterval;
+    timerfd_settime(ptTimerStr->timerfd, 0, &tTimerspec, NULL);
 }
 
 K_BOOL queue_search_int(void *nodedata, void *searchdata)
