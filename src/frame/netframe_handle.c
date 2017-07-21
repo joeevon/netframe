@@ -15,6 +15,7 @@
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
 #include <errno.h>
+#include <assert.h>
 
 extern IO_THREAD_CONTEXT g_szIoThreadContexts[MAX_IO_THREAD];
 extern ACCEPT_THREAD_CONTEXT g_tAcceptContext;
@@ -107,8 +108,6 @@ int netframe_init_handle(HANDLE_THREAD_ITEM *pTheadparam)
 
     if(pHandleContext->queParamFrames && get_unblock_queue_count(pHandleContext->queParamFrames))
     {
-        cnv_hashmap_init(&pHandleContext->HashTimerTask, get_unblock_queue_count(pHandleContext->queParamFrames) + 1, cnv_hashmap_charhash, cnv_hashmap_charequals);
-
         struct queue_entry_t  *queuenode = get_unblock_queue_first(pHandleContext->queParamFrames);
         while(queuenode)     //有定时任务
         {
@@ -123,32 +122,17 @@ int netframe_init_handle(HANDLE_THREAD_ITEM *pTheadparam)
             }
 
             char *pHashKey = (char *)cnv_comm_Malloc(64);
-            if(!pHashKey)
-            {
-                LOG_SYS_ERROR("cnv_comm_Malloc failed!");
-                return CNV_ERR_MALLOC;
-            }
+            assert(pHashKey);
             bzero(pHashKey, 64);
             snprintf(pHashKey, 63, "%s", ptTimerTask->strTaskName);
 
             TIMER_TASK_STRUCT *ptTimerTaskStr = (TIMER_TASK_STRUCT *)cnv_comm_Malloc(sizeof(TIMER_TASK_STRUCT));;
-            if(!ptTimerTaskStr)
-            {
-                LOG_SYS_ERROR("cnv_comm_Malloc failed!");
-                cnv_comm_Free(pHashKey);
-                return CNV_ERR_MALLOC;
-            }
+            assert(ptTimerTaskStr);
             ptTimerTaskStr->pfnHADLE_CALLBACK = ptTimerTask->pfn_timertask_cb;
             ptTimerTaskStr->timerfd = timerfd_create(CLOCK_REALTIME, 0);
 
             HASHMAP_VALUE *pHashValue = (HASHMAP_VALUE *)cnv_comm_Malloc(sizeof(HASHMAP_VALUE));
-            if(!pHashValue)
-            {
-                LOG_SYS_ERROR("cnv_comm_Malloc failed!");
-                cnv_comm_Free(pHashKey);
-                cnv_comm_Free(ptTimerTaskStr);
-                return CNV_ERR_MALLOC;
-            }
+            assert(pHashValue);
             pHashValue->pKey = pHashKey;
             pHashValue->pValue = (char *)ptTimerTaskStr;
 
@@ -221,33 +205,24 @@ int  handle_thread_run(void *pThreadParameter)
                     }
                     else   //定时事件
                     {
-                        void *pOutValue = NULL;
-                        if(pHandleContext->HashTimerTask && cnv_hashmap_get(pHandleContext->HashTimerTask, szEpollEvent[i].data.ptr, &pOutValue) == K_SUCCEED)    //有定时服务
+                        void *pTimer = NULL;
+                        if(cnv_hashmap_get(pHandleContext->HashTimerTask, szEpollEvent[i].data.ptr, &pTimer) == K_SUCCEED)    //有定时服务
                         {
-                            HASHMAP_VALUE *pHashValue = (HASHMAP_VALUE *)pOutValue;
-                            TIMER_TASK_STRUCT *ptCbFunctionStr = (TIMER_TASK_STRUCT *)pHashValue->pValue;
-                            read(ptCbFunctionStr->timerfd, &ulData, sizeof(uint64_t));   //此数据无实际意义,读出避免重复提醒
-
+                            TIMER_TASK_STRUCT *ptCbFunctionStr = (TIMER_TASK_STRUCT *)(((HASHMAP_VALUE *)pTimer)->pValue);
                             STATISTICS_QUEQUE_DATA *ptStatisQueData = NULL;
                             ptCbFunctionStr->pfnHADLE_CALLBACK(&ptStatisQueData, pHandleParams->pBusinessParams);
-                            int nRet = lockfree_queue_enqueue(&(g_tAcceptContext.statis_msgque), ptStatisQueData, 1);   //队列满了把数据丢掉,以免内存泄露
-                            if(nRet == false)
+                            if(ptStatisQueData)
                             {
-                                LOG_SYS_ERROR("statistics queue is full!");
-                                cnv_comm_Free(ptStatisQueData->pData);
-                                cnv_comm_Free(ptStatisQueData);
+                                lockfree_queue_enqueue(&(g_tAcceptContext.statis_msgque), ptStatisQueData, 1);
+                                uint64_t ulWakeup = 1;   //任意值,无实际意义
+                                write(g_tAcceptContext.accept_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒accept
                             }
 
-                            uint64_t ulWakeup = 1;   //任意值,无实际意义
-                            nRet = write(g_tAcceptContext.accept_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒handle
-                            if(nRet != sizeof(ulWakeup))
-                            {
-                                LOG_SYS_FATAL("io wake up accept failed !");
-                            }
+                            read(ptCbFunctionStr->timerfd, &ulData, sizeof(uint64_t));   //读出避免重复提醒
                         }
 
                         void *pTimerAdd = NULL;
-                        if(cnv_hashmap_get(pHandleContext->HashTimerAdd, szEpollEvent[i].data.ptr, &pTimerAdd) == K_SUCCEED)
+                        if(cnv_hashmap_get(pHandleContext->HashTimerAdd, szEpollEvent[i].data.ptr, &pTimerAdd) == K_SUCCEED)  //有手动添加的任务
                         {
                             TIMER_TASK_STRUCT *ptCbFunctionStr = (TIMER_TASK_STRUCT *)(((HASHMAP_VALUE *)pTimerAdd)->pValue);
                             ptCbFunctionStr->pfnTIMER_CALLBACK(szEpollEvent[i].data.ptr, ptCbFunctionStr->arg);
@@ -332,6 +307,7 @@ int  handle_thread_init(HANDLE_THREAD_ITEM *pConfigHandleItem, HANDLE_THREAD_CON
     }
     initiate_unblock_queue(pHandleContext->queDistribute, 30);      //负载队列
 
+    cnv_hashmap_init(&pHandleContext->HashTimerTask, 100, cnv_hashmap_charhash, cnv_hashmap_charequals);
     cnv_hashmap_init(&pHandleContext->HashTimerAdd, 5000, cnv_hashmap_charhash, cnv_hashmap_charequals);
 
     HANDLE_PARAMS *pHandleParams = (HANDLE_PARAMS *)pHandleContext->pHandleParam;
