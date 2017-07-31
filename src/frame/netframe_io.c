@@ -898,7 +898,6 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
     LOG_SYS_DEBUG("lDataRemain:%d, read data length:%d", ptClnSockData->lDataRemain, nDataReadLen);
 
     pfnCNV_PARSE_PROTOCOL pfncnvparseprotocol = pSocketElement->uSockElement.tClnSockElement.pfncnv_parse_protocol;  //协议解析回调函数
-
     while(ptClnSockData->lDataRemain > 0)
     {
         char *pPacket = NULL;
@@ -909,15 +908,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
         {
             if(nRet == CNV_PARSE_FINISH)  //结束解析而且有剩余数据
             {
-                if(ptClnSockData->lDataRemain < g_params.nMaxBufferSize)
-                {
-                    memcpy(ptClnSockData->pDataBuffer, ptClnSockData->pMovePointer, ptClnSockData->lDataRemain);
-                }
-                else
-                {
-                    LOG_SYS_ERROR("single package beyond max buffer.");
-                    remove_client_socket_hashmap(Epollfd, HashConnidFd, pConnId);
-                }
+                memcpy(ptClnSockData->pDataBuffer, ptClnSockData->pMovePointer, ptClnSockData->lDataRemain);
             }
             else if(nRet == CNV_PARSE_SHUTDOWN)    //关闭客户端
             {
@@ -926,7 +917,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
             else if(nRet == CNV_PARSE_MOVE)     //数据偏移
             {
                 ptClnSockData->lDataRemain -= nMoveSize;      //总数据长度减去一个包的数据大小
-                ptClnSockData->pMovePointer += nMoveSize; //数据缓存指针偏移
+                ptClnSockData->pMovePointer += nMoveSize;   //数据缓存指针偏移
                 continue;
             }
             else if(nRet == CNV_PARSE_ERROR)    //解析错误,关闭客户端
@@ -973,7 +964,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
         }
 
         uint64_t  ulWakeup = 1;   //任意值,无实际意义
-        nRet = write(pHandleContext->io_handle_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒handle
+        write(pHandleContext->io_handle_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒handle
     }
 
     LOG_SYS_DEBUG("iothread_handle_read end.");
