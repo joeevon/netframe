@@ -123,14 +123,6 @@ int  accept_select_io_thread(ACCEPT_THREAD_ITEM *pAcceptItem, IO_THREAD_CONTEXT 
 int  accept_set_iodata(int ClientFd, ACCEPT_THREAD_ITEM *pAcceptItem, struct sockaddr_in *ClientAddr, ACCEPT_TO_IO_DATA *AcceptIOData)
 {
     AcceptIOData->fd = ClientFd;  // 客户端fd
-    if(pAcceptItem->uMapType == 0)   //默认用连接ID做映射
-    {
-        AcceptIOData->uMapType = 0;
-    }
-    else    //用客户端的ip和端口做映射
-    {
-        AcceptIOData->uMapType = 1;
-    }
     memcpy(AcceptIOData->strClientIp, inet_ntoa(ClientAddr->sin_addr), sizeof(AcceptIOData->strClientIp) - 1);
     AcceptIOData->uClientPort = ntohs(ClientAddr->sin_port);
     snprintf(AcceptIOData->strTransmission, sizeof(AcceptIOData->strTransmission) - 1, "%s", pAcceptItem->strTransmission);   // 通信协议

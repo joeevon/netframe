@@ -440,7 +440,6 @@ int netframe_write(int Socket, char *pDataBuffer, int nDataLen, int *pnLenAlread
     if(nSendLen != nDataLen && pnLenAlreadyWrite)    //数据发送不完整
     {
         *pnLenAlreadyWrite = nSendLen;
-        LOG_SYS_ERROR("write %d bytes, remain %d bytes.", nSendLen, (nDataLen - nSendLen));
         return AGENT_NET_WRITE_INCOMPLETED;
     }
 
@@ -450,36 +449,31 @@ int netframe_write(int Socket, char *pDataBuffer, int nDataLen, int *pnLenAlread
 
 int netframe_sendmsg(int Socket, struct msghdr *pmsg, int nDataLen, int *pnLenAlreadyWrite)
 {
-    if(nDataLen <= 0)
-    {
-        LOG_SYS_ERROR("illegal length:%d", nDataLen);
-        return AGENT_NET_ILLEGAL_LENGTH;
-    }
-
     int nSendLen = sendmsg(Socket, pmsg, 0);
     if(nSendLen < 0)
     {
         int nErrno = errno;
         if(nErrno == EAGAIN)
         {
-            LOG_SYS_DEBUG("EAGAIN happens");
+            LOG_SYS_ERROR("%s.", strerror(nErrno));
+            nSendLen = 0;
         }
         else if(nErrno == EINTR)
         {
-            LOG_SYS_DEBUG("write is busy, error type:EINTR, nErrno:%d", nErrno);
+            LOG_SYS_ERROR("%s.", strerror(nErrno));
+            nSendLen = 0;
         }
         else
         {
-            LOG_SYS_ERROR("%s", strerror(nErrno));
+            LOG_SYS_ERROR("%s.", strerror(nErrno));
             return AGENT_NET_CONNECTION_ABNORMAL;
         }
     }
 
-    if(nSendLen < nDataLen && nSendLen >= 0 && pnLenAlreadyWrite)   //数据发送不完整
+    if(nSendLen != nDataLen && pnLenAlreadyWrite)   //数据发送不完整
     {
         *pnLenAlreadyWrite = nSendLen;
         LOG_SYS_ERROR("write %d bytes, remain %d bytes.", nSendLen, (nDataLen - nSendLen));
-
         return AGENT_NET_WRITE_INCOMPLETED;
     }
 

@@ -141,7 +141,6 @@ extern "C"
     {
         char  strHost[DEFAULT_ARRAY_SIZE];        //服务ip
         unsigned int  ulPort;     //端口
-        unsigned int  uMapType;   //客户端映射方式:1.连接ID  2.客户端地址
         char  strUnixDomainPath[256];     //unix.domain路径
         char  strTransmission[DEFAULT_ARRAY_SIZE];     //传输协议
         char  strDistribution[DEFAULT_ARRAY_SIZE];        //负载分发
@@ -183,7 +182,6 @@ extern "C"
     typedef  struct  __ACCEPT_TO_IO_DATA
     {
         int  fd;
-        unsigned int uMapType;
         char strClientIp[DEFAULT_ARRAY_SIZE];
         unsigned short uClientPort;
         char  strTransmission[DEFAULT_ARRAY_SIZE];     // 传输协议,IO需根据传输协议来收数据
@@ -214,7 +212,6 @@ extern "C"
         char strServiceName[DEFAULT_ARRAY_SIZE];  //服务名字,供找同类服务器使用
         char strClientIp[DEFAULT_ARRAY_SIZE];
         unsigned short uClientPort;
-        int lSourceCode;   //来源
         struct sockaddr_in tClientAddr;
         struct iovec tIovecClnData;
         struct msghdr msg;       //数据内容
@@ -226,6 +223,8 @@ extern "C"
 
     typedef  struct  __SERVER_SOCKET_ELEMENT
     {
+        unsigned int  lWriteRemain;
+        char *pWriteRemain;
         struct sockaddr_in tServerAddr;
         struct iovec szIovecSvrData[2];
         struct msghdr msg;       //数据内容

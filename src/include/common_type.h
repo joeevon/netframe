@@ -27,10 +27,9 @@ extern "C"
     typedef enum _CNV_PARSE_RETURN
     {
         CNV_PARSE_SUCCESS = 0,    //正确解析
-        CNV_PARSE_FINISH = 1,     //结束解析
-        CNV_PARSE_ERROR = 2,     //解析错误
-        CNV_PARSE_SHUTDOWN = 3,     //关闭客户端
-        CNV_PARSE_MOVE = 4,     //数据偏移
+        CNV_PARSE_FINISH = 1,     //数据不完整,结束解析
+        CNV_PARSE_SHUTDOWN = 2,     //关闭客户端
+        CNV_PARSE_MOVE = 3,     //数据偏移
     }
     CNV_PARSE_RETURN;
 

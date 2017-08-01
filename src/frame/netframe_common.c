@@ -100,11 +100,6 @@ int netframe_init_config()
                             pItemVaule = (char *)xmlNodeGetContent(ptNode);
                             g_params.tConfigAccept.szConfigAcceptItem[lIndex].ulPort = atoi(pItemVaule);
                         }
-                        else if(!xmlStrcmp(ptNode->name, (const xmlChar *)"maptype"))
-                        {
-                            pItemVaule = (char *)xmlNodeGetContent(ptNode);
-                            g_params.tConfigAccept.szConfigAcceptItem[lIndex].uMapType = atoi(pItemVaule);
-                        }
                         else if(!xmlStrcmp(ptNode->name, (const xmlChar *)"unixdomainpath"))
                         {
                             pItemVaule = (char *)xmlNodeGetContent(ptNode);
@@ -925,7 +920,7 @@ void  remove_client_socket_hashmap(int Epollfd, void *HashConnidFd, void *pKey)
     cnv_comm_Free(pOutValue);  //hashvalue
 }
 
-void  remove_server_socket_hashmap(int Epollfd, void *HashAddrFd, void *pKey)
+void remove_server_socket_hashmap(int Epollfd, void *HashAddrFd, void *pKey)
 {
     void *pOutValue = NULL;
     if(cnv_hashmap_get(HashAddrFd, pKey, &pOutValue) != K_SUCCEED)     //已被删除
@@ -936,13 +931,13 @@ void  remove_server_socket_hashmap(int Epollfd, void *HashAddrFd, void *pKey)
 
     cnv_hashmap_remove(HashAddrFd, pKey, NULL);
     netframe_close_socket(pSocketElement->Socket);
-    /*if(strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strProtocol, "UNIXSOCKET") == 0)
+    if(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain)
     {
-        unlink(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strUnixDomainPath);
-    }*/
-    cnv_comm_Free(pSocketElement->pConnId);   //hashkey
-    cnv_comm_Free(pSocketElement);
-    cnv_comm_Free(pOutValue);  //hash value
+        free(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain);
+    }
+    free(pSocketElement->pConnId);   //hashkey
+    free(pSocketElement);
+    free(pOutValue);  //hash value
 }
 
 void  cnv_hashmap_free_socket(void *Hashmap, void *Epollfd)
@@ -972,12 +967,12 @@ K_BOOL earase_server_socket_hashmap(void *pKey, void *pValue, void *pContext, K_
     cnv_comm_Free(pKey);
     SOCKET_ELEMENT *pSocketElement = (SOCKET_ELEMENT *)(((HASHMAP_VALUE *)pValue)->pValue);
     netframe_close_socket(pSocketElement->Socket);
-    /*if(strcmp(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strProtocol, "UNIXSOCKET") == 0)
+    if(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain)
     {
-        unlink(pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strUnixDomainPath);
-    }*/
-    cnv_comm_Free(pSocketElement);
-    cnv_comm_Free(pValue);
+        free(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain);
+    }
+    free(pSocketElement);
+    free(pValue);
 
     *bIsEarase = true;
     return  true;
