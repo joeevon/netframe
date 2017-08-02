@@ -934,6 +934,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
             }
             else if(nRet == CNV_PARSE_SHUTDOWN)    //关闭客户端
             {
+                LOG_SYS_ERROR("shutdown %s.", pSocketElement->uSockElement.tClnSockElement.strClientIp);
                 remove_client_socket_hashmap(Epollfd, HashConnidFd, pConnId);
                 break;
             }
