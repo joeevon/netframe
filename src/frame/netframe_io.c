@@ -162,7 +162,7 @@ int  iothread_get_hashsocket(HANDLE_TO_IO_DATA *pHandIOData, void *HashAddrFd, v
         nRet = cnv_hashmap_get(HashAddrFd, strKey, (void **)pOutValue);
         if(nRet != K_SUCCEED)
         {
-            LOG_SYS_ERROR("cnv_hashmap_get failded. HashAddrFd.size=%d, key=%s.", cnv_hashmap_size(HashAddrFd), strKey);
+            LOG_SYS_INFO("cnv_hashmap_get failded. HashAddrFd.size=%d, key=%s.", cnv_hashmap_size(HashAddrFd), strKey);
             cnv_hashmap_iterator(HashAddrFd, printhashmap, NULL);
             return nRet;
         }
@@ -1213,6 +1213,7 @@ int  io_thread_run(void *pThreadParameter)
         else if(nCount < 0)   //错误
         {
             LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
+            exit(0);  //此错误会引起线程死循环,为解决,先退出进程
         }
     }
 
