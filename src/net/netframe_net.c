@@ -387,6 +387,7 @@ int netframe_recvmsg(int Socket, struct msghdr *pmsg, int *pDataLen)
     {
         if(errno == EAGAIN)
         {
+            LOG_SYS_ERROR("%s", strerror(errno));
             return AGENT_NET_READ_BUSY;
         }
         else if(errno == EINTR)
@@ -422,7 +423,7 @@ int netframe_write(int Socket, char *pDataBuffer, int nDataLen, int *pnLenAlread
         int nErrno = errno;
         if(nErrno == EAGAIN)
         {
-            LOG_SYS_ERROR("%s.", strerror(nErrno));
+            LOG_SYS_INFO("%s.", strerror(nErrno));
             nSendLen = 0;
         }
         else if(nErrno == EINTR)
@@ -615,178 +616,4 @@ K_BOOL netframe_is_selfconnected(int Sockfd)
     struct sockaddr_in tLocalAddr = netframe_get_localaddr(Sockfd);
     struct sockaddr_in peeraddr = netframe_get_peeraddr(Sockfd);
     return tLocalAddr.sin_port == peeraddr.sin_port && tLocalAddr.sin_addr.s_addr == peeraddr.sin_addr.s_addr;
-}
-
-int svc_protobuffer_packex(short in_iFlags,
-                           char *in_pTypeName,
-                           int in_lNameLen,
-                           char *in_pData,
-                           int in_lDataLen,
-                           char **out_pProtoBuf,
-                           int *out_plProtoBufLen)
-{
-    int lLen = sizeof(int) * 3;
-    char *pBuffer = K_NULL,
-          *ptr = K_NULL;
-    NAVI_SVC_PROTOBUFFER protoBuf = {0};
-    unsigned int ulChecksum = 1;
-
-    if(((in_pTypeName == K_NULL || in_lNameLen <= 0)
-            && (in_pData == K_NULL || in_lDataLen <= 0))
-            || (out_pProtoBuf == K_NULL || out_plProtoBufLen == K_NULL))
-    {
-        LOG_SYS_ERROR("the parameters is invalid.errno: %d.", CNV_ERR_PARAM);
-        //参数错误
-        return CNV_ERR_PARAM;
-    }
-    protoBuf.flags = in_iFlags;
-    if(in_pTypeName != K_NULL && in_lNameLen > 0)
-    {
-        lLen += in_lNameLen;
-        protoBuf.lNameLen = (short)in_lNameLen;
-    }
-    if(in_pData != K_NULL && in_lDataLen > 0)
-    {
-        lLen += in_lDataLen;
-    }
-    protoBuf.lLen = lLen - sizeof(int);
-    pBuffer = (char *)cnv_comm_Malloc(lLen);
-    if(pBuffer == K_NULL)
-    {
-        LOG_SYS_ERROR("failed to malloc a buffer.errno: %d.", CNV_ERR_MALLOC);
-        return CNV_ERR_MALLOC;
-    }
-    memset(pBuffer, 0, lLen);
-    ptr = pBuffer;
-    memcpy(ptr, &protoBuf, sizeof(int) * 2);
-    ptr += sizeof(int) * 2;
-
-    if(in_pTypeName != K_NULL && in_lNameLen > 0)
-    {
-        memcpy(ptr, in_pTypeName, in_lNameLen);
-        ptr += in_lNameLen;
-    }
-    if(in_pData != K_NULL && in_lDataLen > 0)
-    {
-        memcpy(ptr, in_pData, in_lDataLen);
-        ptr += in_lDataLen;
-    }
-    if(protoBuf.flags & 0x01)
-    {
-
-        ulChecksum = 0;
-        cnv_net_crc32_checksum(pBuffer,
-                               lLen - sizeof(int),
-                               &ulChecksum);
-    }
-    else
-    {
-
-        ulChecksum = cnv_adler32_checksum(ulChecksum, (const K_UINT8 *)pBuffer, lLen - sizeof(int));
-    }
-
-    memcpy(ptr, &ulChecksum, sizeof(unsigned int));
-
-    *out_pProtoBuf = pBuffer;
-    *out_plProtoBufLen = lLen;
-
-    return K_SUCCEED;
-}
-
-K_BOOL svc_protobuffer_check(char *in_pProtoBufData,
-                             int in_lProtoBufDataLen)
-{
-    unsigned int ulChecksum = 1,
-                 ulOldChecksum = 0;
-
-    NAVI_SVC_PROTOBUFFER *pProtoBuf = (NAVI_SVC_PROTOBUFFER *)in_pProtoBufData;
-
-    if((in_pProtoBufData == K_NULL)
-            || (in_lProtoBufDataLen <= 0)
-            || (pProtoBuf->lLen <= 0))
-    {
-        LOG_SYS_ERROR("the parameters is invalid.errno: %d.", CNV_ERR_PARAM);
-        //参数错误
-        return K_FALSE;
-    }
-
-    if(pProtoBuf->flags & 0x01)
-    {
-
-        ulChecksum = 0;
-        cnv_net_crc32_checksum(in_pProtoBufData,
-                               pProtoBuf->lLen,
-                               &ulChecksum);
-    }
-    else
-    {
-
-        ulChecksum = cnv_adler32_checksum(ulChecksum,
-                                          (const K_UINT8 *)in_pProtoBufData,
-                                          pProtoBuf->lLen);
-
-    }
-    ulOldChecksum = *((unsigned int *)((char *)(in_pProtoBufData + pProtoBuf->lLen)));
-
-    if(ulChecksum != ulOldChecksum)
-    {
-
-        LOG_SYS_ERROR("checksum failed. flags: %d, length: %d,  buffer checksum: %u, checksum: %u.",
-                      pProtoBuf->flags,
-                      pProtoBuf->lLen,
-                      ulChecksum,
-                      ulOldChecksum);
-    }
-
-    return (ulChecksum == ulOldChecksum) ? true : K_FALSE;
-}
-
-int svc_protobuffer_unpackex(char *in_pProtoBufData,
-                             int in_plProtoBufDataLen,
-                             short *out_piFlags,
-                             char **out_pTypeName,
-                             int *out_plNameLen,
-                             char **out_pData,
-                             int *out_plDataLen)
-{
-    char *ptr = in_pProtoBufData;
-    NAVI_SVC_PROTOBUFFER *pProtoBuf = (NAVI_SVC_PROTOBUFFER *)in_pProtoBufData;
-
-    if(out_piFlags != K_NULL)
-        *out_piFlags = 0;
-
-    if(in_pProtoBufData == K_NULL
-            || in_plProtoBufDataLen <= 0
-            || pProtoBuf->lLen <= 0)
-    {
-        LOG_SYS_ERROR("the parameters is invalid.errno: %d.", CNV_ERR_PARAM);
-        //参数错误
-        return CNV_ERR_PARAM;
-    }
-    //校验
-    //if(!svc_protobuffer_check(in_pProtoBufData, in_plProtoBufDataLen))
-    //{
-    //  LOG_SYS_ERROR("the protocol buffer's checksum error.errno: %d.", ERRORCODE_WEBSVC_NET_CHECKSUM_FAILED);
-    //  return ERRORCODE_WEBSVC_NET_CHECKSUM_FAILED;
-    //}
-    if(out_piFlags != K_NULL)
-        *out_piFlags = pProtoBuf->flags;
-
-    ptr += sizeof(int) * 2;
-    if(pProtoBuf->lNameLen > 0)
-    {
-        if(out_pTypeName != K_NULL
-                && out_plNameLen != K_NULL)
-        {
-            *out_pTypeName = ptr;
-            *out_plNameLen = pProtoBuf->lNameLen;
-        }
-        ptr +=  pProtoBuf->lNameLen;
-    }
-    if(out_pData != K_NULL && out_plDataLen != K_NULL)
-    {
-        *out_pData = ptr;
-        *out_plDataLen = pProtoBuf->lLen - pProtoBuf->lNameLen - sizeof(int) * 2;
-    }
-    return K_SUCCEED;
 }

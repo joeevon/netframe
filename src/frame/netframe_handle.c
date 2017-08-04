@@ -68,11 +68,12 @@ void handlethread_handle_iomsg(int  EventfdIo, void *pBusinessParams, HANDLE_THR
         nRet = push_block_queue_tail(pIOHanldeData->handle_io_msgque, pPostData, 1);  //队列满了把数据丢掉,以免内存泄露
         if(nRet == false)
         {
-            LOG_SYS_ERROR("handle_io queue is full!");
+            LOG_SYS_ERROR("handle_io queue is full.");
             free(((HANDLE_TO_IO_DATA *)pPostData)->pDataSend);
             free(pPostData);
             continue;
         }
+
         bIsWakeIO = true;
     }
 
@@ -80,6 +81,10 @@ void handlethread_handle_iomsg(int  EventfdIo, void *pBusinessParams, HANDLE_THR
     {
         uint64_t ulWakeup = 1;
         nRet = write(pIOHanldeData->handle_io_eventfd, &ulWakeup, sizeof(uint64_t));  //handle唤醒io
+        if(nRet != sizeof(ulWakeup))
+        {
+            LOG_SYS_FATAL("handle wake io failed.");
+        }
     }
 
     free(pIOHanldeData->pDataSend);
@@ -211,14 +216,14 @@ int  handle_thread_run(void *pThreadParameter)
                             TIMER_TASK_STRUCT *ptCbFunctionStr = (TIMER_TASK_STRUCT *)(((HASHMAP_VALUE *)pTimer)->pValue);
                             STATISTICS_QUEQUE_DATA *ptStatisQueData = NULL;
                             ptCbFunctionStr->pfnHADLE_CALLBACK(&ptStatisQueData, pHandleParams->pBusinessParams);
+                            read(ptCbFunctionStr->timerfd, &ulData, sizeof(uint64_t));   //读出避免重复提醒
+
                             if(ptStatisQueData)
                             {
                                 lockfree_queue_enqueue(&(g_tAcceptContext.statis_msgque), ptStatisQueData, 1);
                                 uint64_t ulWakeup = 1;   //任意值,无实际意义
                                 write(g_tAcceptContext.accept_eventfd, &ulWakeup, sizeof(ulWakeup));  //io唤醒accept
                             }
-
-                            read(ptCbFunctionStr->timerfd, &ulData, sizeof(uint64_t));   //读出避免重复提醒
                         }
 
                         void *pTimerAdd = NULL;

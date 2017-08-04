@@ -525,13 +525,10 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
             nRet = write(pContext->accept_io_eventfd, &ulWakeup, sizeof(ulWakeup));
             if(nRet != sizeof(ulWakeup))
             {
-                LOG_SYS_FATAL("accept wake up io failed !");
+                LOG_SYS_FATAL("accept wake io failed !");
             }
-            else
-            {
-                LOG_SYS_DEBUG("write io thread %d", nIndex);
-            }
-            cnv_comm_Free(pEventIndex);
+
+            free(pEventIndex);
         }
     }
 
