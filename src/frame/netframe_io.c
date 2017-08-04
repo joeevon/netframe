@@ -565,10 +565,34 @@ int respond_write_server(int Epollfd, char *pOutValue, HANDLE_TO_IO_DATA *pHandl
         {
             LOG_SYS_ERROR("write %s imcomplete, all:%d, write:%d.", pSocketElement->uSockElement.tSvrSockElement.pSvrSockData->strServerIp, nDataLen, nLenAlreadyWrite);
             pSocketElement->Time = cnv_comm_get_utctime();   //重置时间戳
-            pSocketElement->uSockElement.tSvrSockElement.lWriteRemain = nDataLen - nLenAlreadyWrite;
-            pSocketElement->uSockElement.tSvrSockElement.pWriteRemain = (char *)realloc(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain, pSocketElement->uSockElement.tSvrSockElement.lWriteRemain);
-            assert(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain);
-            memcpy(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain, pDataSend + nLenAlreadyWrite, pSocketElement->uSockElement.tSvrSockElement.lWriteRemain);
+            if(nLenAlreadyWrite == 0)  //EAGAIN,数据写回发送队列
+            {
+                HANDLE_TO_IO_DATA *ptHandleIODataAgain = (HANDLE_TO_IO_DATA *)malloc(sizeof(HANDLE_TO_IO_DATA));  //新申请,原来的会释放
+                assert(ptHandleIODataAgain);
+                memset(ptHandleIODataAgain, 0, sizeof(HANDLE_TO_IO_DATA));
+                ptHandleIODataAgain->lAction = REQUEST_SERVICE;
+                memcpy(ptHandleIODataAgain->strServIp, pHandleIOData->strServIp, sizeof(ptHandleIODataAgain->strServIp) - 1);
+                ptHandleIODataAgain->ulPort = pHandleIOData->ulPort;
+                ptHandleIODataAgain->lDataLen = pHandleIOData->lDataLen;
+                ptHandleIODataAgain->pDataSend = (char *)malloc(pHandleIOData->lDataLen);
+                assert(ptHandleIODataAgain->pDataSend);
+                memcpy(ptHandleIODataAgain->pDataSend, pHandleIOData->pDataSend, ptHandleIODataAgain->lDataLen);
+
+                nRet = push_block_queue_tail(pIoThreadContext->handle_io_msgque, ptHandleIODataAgain, 1);  //队列满了把数据丢掉,以免内存泄露
+                if(nRet == false)
+                {
+                    free(ptHandleIODataAgain->pDataSend);
+                    free(ptHandleIODataAgain);
+                }
+            }
+            else
+            {
+                pSocketElement->uSockElement.tSvrSockElement.lWriteRemain = nDataLen - nLenAlreadyWrite;
+                pSocketElement->uSockElement.tSvrSockElement.pWriteRemain = (char *)realloc(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain, pSocketElement->uSockElement.tSvrSockElement.lWriteRemain);
+                assert(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain);
+                memcpy(pSocketElement->uSockElement.tSvrSockElement.pWriteRemain, pDataSend + nLenAlreadyWrite, pSocketElement->uSockElement.tSvrSockElement.lWriteRemain);
+            }
+
             nRet = CNV_ERR_OK;
         }
         else if(nRet == AGENT_NET_CONNECTION_ABNORMAL)    //连接异常
@@ -968,7 +992,7 @@ int iothread_handle_read(int Epollfd, void *pConnId, int nSocket, void *HashConn
         if(nRet == false)
         {
             LOG_SYS_ERROR("io_handle queue is full.");
-            free(pPacket);
+            free(pIOHanldeData->pDataSend);
             free(pIOHanldeData);
             pIoThreadContext->tMonitorElement.lSvrFailedNum++;
             continue;
