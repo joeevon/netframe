@@ -7,3 +7,11 @@
 /src/*.user
 /src/Debug
 /src/*.opendb
+/example/server/.vs/server/v14/.suo
+/example/server/build.sh
+/example/server/server.VC.opendb
+/example/server/server.sdf
+/example/server/server.sln
+/example/server/server.vcxproj
+/example/server/server.vcxproj.filters
+/example/server/server.vcxproj.user

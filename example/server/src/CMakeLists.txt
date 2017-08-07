@@ -1,7 +1,7 @@
 project(server.ums)
 
 list(APPEND SRC
-	server.c
+		main.cpp
 	)
 
 list(APPEND LIBS
