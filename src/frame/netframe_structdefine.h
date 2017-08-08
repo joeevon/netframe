@@ -108,7 +108,7 @@ extern "C"
         int  lThreadIndex;     //开启线时自定义的序号
         int nIsStasistics;   //是否统计
         char  strThreadName[DEFAULT_ARRAY_SIZE];
-        char  strDistribution[DEFAULT_ARRAY_SIZE];
+        char  strDistribution[128];
         char  strAlgorithm[DEFAULT_ARRAY_SIZE];
         pthread_t  ulThreadId;    //线程ID
         void   *ThreadHandle;

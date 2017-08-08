@@ -1034,7 +1034,7 @@ int  io_set_handle_contexts(IO_THREAD_ITEM   *pConfigIOItem, HANDLE_THREAD_CONTE
     int nThreadIndex = 0;
     int nRealHandleThread = 0;  //handle线程变量的排序
     char strDistriTrans[32] = { 0 };
-    cnv_comm_string_trans(pConfigIOItem->strDistribution, sizeof(strDistriTrans), ',', strDistriTrans);
+    cnv_comm_string_trans(pConfigIOItem->strDistribution, sizeof(pConfigIOItem->strDistribution), ',', strDistriTrans);
 
     char  *pDistribution = strtok(strDistriTrans, ",");
     while(pDistribution)
@@ -1247,6 +1247,10 @@ int  io_thread_run(void *pThreadParameter)
                 else if(szEpollEvent[i].events & EPOLLOUT)  //写事件
                 {
                     iothread_handle_write(Epollfd, szEpollEvent[i].data.ptr, HashConnidFd, pIoThreadContext);
+                }
+                else if(errno == EINTR)
+                {
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                 }
                 else
                 {

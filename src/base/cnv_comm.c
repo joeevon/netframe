@@ -118,7 +118,7 @@ void cnv_comm_string_trans(char *pSource, int len, char sepachar, char *pDest)
 
     for(i = 0; i < len; i++)
     {
-        if((pDistriTmp[i] > '0' && pDistriTmp[i] < '9') || pDistriTmp[i] == sepachar)
+        if((pDistriTmp[i] >= '0' && pDistriTmp[i] <= '9') || pDistriTmp[i] == sepachar)
         {
             pDest[j++] = pDistriTmp[i];
         }

@@ -502,6 +502,10 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
                 {
                     LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
                 }
+                else if(errno == EINTR)
+                {
+                    LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
+                }
                 else
                 {
                     LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
@@ -539,7 +543,7 @@ int accept_set_io_context(ACCEPT_THREAD_ITEM *pConfigAcceptItem, IO_THREAD_CONTE
 {
     int  lThreadIndex = 0;
     char  DistriTrans[32] = { 0 };
-    cnv_comm_string_trans(pConfigAcceptItem->strDistribution, sizeof(DistriTrans), ',', DistriTrans);
+    cnv_comm_string_trans(pConfigAcceptItem->strDistribution, sizeof(pConfigAcceptItem->strDistribution), ',', DistriTrans);
 
     char *pDistribution = strtok(DistriTrans, ",");
     while(pDistribution)
