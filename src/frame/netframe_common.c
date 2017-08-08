@@ -593,7 +593,7 @@ int  netframe_socket_clear(int Epollfd, int fd, void *HashConnidFd)
 int cnv_parse_distribution(char *strAlgorithm, char *strDistribution, CNV_UNBLOCKING_QUEUE *queDistribute)
 {
     int  i = 1;
-    char  DistriTrans[64] = {0};
+    char  DistriTrans[128] = {0};
     cnv_comm_string_trans(strDistribution, strlen(strDistribution), ',', DistriTrans);
 
     if(!strcmp(strAlgorithm, "0") || !strcmp(strAlgorithm, ""))   //algorithm为0或没有值,即平均轮询

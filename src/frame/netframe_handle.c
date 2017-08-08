@@ -268,7 +268,7 @@ int  handle_thread_run(void *pThreadParameter)
         else if(nCount < 0)
         {
             LOG_SYS_ERROR("epoll_wait abnormal,%s.", strerror(errno));
-            //exit(0);  //此错误会引起线程死循环,为解决,先退出进程
+            exit(0);  //此错误会引起线程死循环,为解决,先退出进程
         }
     }
 

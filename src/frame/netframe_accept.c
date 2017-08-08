@@ -542,7 +542,7 @@ int  accept_thread_run(NETFRAME_CONFIG_ACCEPT *pThreadparam)
 int accept_set_io_context(ACCEPT_THREAD_ITEM *pConfigAcceptItem, IO_THREAD_CONTEXT *pIoThreadContexts)
 {
     int  lThreadIndex = 0;
-    char  DistriTrans[32] = { 0 };
+    char  DistriTrans[128] = { 0 };
     cnv_comm_string_trans(pConfigAcceptItem->strDistribution, sizeof(pConfigAcceptItem->strDistribution), ',', DistriTrans);
 
     char *pDistribution = strtok(DistriTrans, ",");

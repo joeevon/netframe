@@ -1033,7 +1033,7 @@ int  io_set_handle_contexts(IO_THREAD_ITEM   *pConfigIOItem, HANDLE_THREAD_CONTE
 {
     int nThreadIndex = 0;
     int nRealHandleThread = 0;  //handle线程变量的排序
-    char strDistriTrans[32] = { 0 };
+    char strDistriTrans[128] = { 0 };
     cnv_comm_string_trans(pConfigIOItem->strDistribution, sizeof(pConfigIOItem->strDistribution), ',', strDistriTrans);
 
     char  *pDistribution = strtok(strDistriTrans, ",");
