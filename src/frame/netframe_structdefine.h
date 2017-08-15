@@ -75,6 +75,7 @@ extern "C"
     typedef struct __IO_THREAD_CONTEXT
     {
         char strStartTime[64];
+        int  nIsStasistics;   //是否统计
         int  Epollfd;
         int  nDistributeType;   //分发类型  1、权重   2、哈希   3、负载
         int  timerfd_socketclear;     //socket清理
@@ -106,7 +107,7 @@ extern "C"
     typedef  struct  __IO_THREAD_ITEM
     {
         int  lThreadIndex;     //开启线时自定义的序号
-        int nIsStasistics;   //是否统计
+        int  nIsStasistics;   //是否统计
         char  strThreadName[DEFAULT_ARRAY_SIZE];
         char  strDistribution[128];
         char  strAlgorithm[DEFAULT_ARRAY_SIZE];

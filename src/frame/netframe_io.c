@@ -95,7 +95,7 @@ void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
         }
     }
 
-    if(pIoThreadContext->pfncnv_monitor_callback)
+    if(pIoThreadContext->nIsStasistics && pIoThreadContext->pfncnv_monitor_callback)
     {
         memcpy(pIoThreadContext->tMonitorElement.strStartTime, pIoThreadContext->strStartTime, sizeof(pIoThreadContext->tMonitorElement.strStartTime) - 1);
         pIoThreadContext->tMonitorElement.nThreadIndex = pIoThreadContext->threadindex;
@@ -109,9 +109,9 @@ void  monitor_iothread(IO_THREAD_CONTEXT *pIoThreadContext)
         int nRet = lockfree_queue_enqueue(&(g_tAcceptContext.statis_msgque), ptStatisQueData, 1);   //队列满了把数据丢掉,以免内存泄露
         if(nRet == false)
         {
-            LOG_SYS_ERROR("auxiliary queue is full!");
-            cnv_comm_Free(ptStatisQueData->pData);
-            cnv_comm_Free(ptStatisQueData);
+            LOG_SYS_ERROR("auxiliary queue is full.");
+            free(ptStatisQueData->pData);
+            free(ptStatisQueData);
         }
 
         uint64_t ulWakeup = 1;   //任意值,无实际意义
@@ -1305,7 +1305,7 @@ void  io_thread_uninit(IO_THREAD_CONTEXT *pIoThreadContexts)
 }
 
 //功能:io线程初始化
-int  io_thread_init(IO_THREAD_ITEM   *pConfigIOItem, HANDLE_THREAD_CONTEXT *pHandleContexts, IO_THREAD_CONTEXT *pIoThreadContext)
+int  io_thread_init(IO_THREAD_ITEM  *pConfigIOItem, HANDLE_THREAD_CONTEXT *pHandleContexts, IO_THREAD_CONTEXT *pIoThreadContext)
 {
     int  nRet = CNV_ERR_OK;
     nRet = io_set_handle_contexts(pConfigIOItem, pHandleContexts, pIoThreadContext);
@@ -1313,6 +1313,7 @@ int  io_thread_init(IO_THREAD_ITEM   *pConfigIOItem, HANDLE_THREAD_CONTEXT *pHan
     {
         return nRet;
     }
+    pIoThreadContext->nIsStasistics = pConfigIOItem->nIsStasistics;
     netframe_create_epoll(&(pIoThreadContext->Epollfd), 5);   //epoll
     pIoThreadContext->accept_io_eventfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     pIoThreadContext->handle_io_eventfd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
